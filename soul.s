@@ -32,6 +32,11 @@ _start:
 interrupt_vector:
     b RESET_HANDLER
 
+@Syscall
+.org 0x08
+    b SYSCALL
+
+
 .org 0x18
     b IRQ_HANDLER
 
@@ -42,6 +47,8 @@ TIME_COUNTER: .word 0x0
 @ Vetor de interrupções
 .org 0x100
 .text
+SYSCALL:
+
 
 RESET_HANDLER:
     @ Zera o contador
