@@ -1,6 +1,7 @@
 @@@ All teh sets @@@
 @ System time
 .set TIME_SZ,               200000
+
 @ GPT Constants
 .set GPT_BASE,              0x53FA0000
 .set GPT_CR,                0x00
@@ -9,6 +10,7 @@
 .set GPT_IR,                0x0C
 .set GPT_OCR1,              0x10
 .set GPT_CR_VALUE,          0x00000041
+
 @ TZIC Constants
 .set TZIC_BASE,             0x0FFFC000
 .set TZIC_INTCTRL,          0x0
@@ -16,6 +18,7 @@
 .set TZIC_ENSET1,           0x104
 .set TZIC_PRIOMASK,         0xC
 .set TZIC_PRIORITY9,        0x424
+
 @ GPIO Definition
 .set GPIO_BASE,             0x53F84000
 .set GPIO_DR,               0x00
@@ -46,9 +49,29 @@ TIME_COUNTER: .word 0x0
 
 @ Vetor de interrupções
 .org 0x100
+
 .text
 SYSCALL:
+    cmp r7, #16
+    beq READ_SONAR
 
+    cmp r7, #17
+    beq REG_PROX_CALLBACK
+    
+    cmp r7, #18
+    beq SET_MOTOR_SPEED
+
+    cmp r7, #19
+    beq SET_MOTORS_SPEED
+
+    cmp r7, #20
+    beq GET_TIME
+
+    cmp r7, #21
+    beq SET_TIME
+
+    cmp r7, #22
+    beq SET_ALARM
 
 RESET_HANDLER:
     @ Zera o contador
