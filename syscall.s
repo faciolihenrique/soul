@@ -43,6 +43,9 @@ GET_TIME:
 
 .align 4
 SET_TIME:
+    ldr r1, =TIME_COUNTER
+    str r0, [r1]
+
 
 .align 4
 SET_ALARM:
