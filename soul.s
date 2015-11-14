@@ -25,6 +25,9 @@
 .set GPIO_GDIR,             0x04
 .set GPIO_PSR,              0x08
 
+@ Lab Constants
+.set MAX_ALARMS,            0x08
+.set MAX_CALLBACKS          0x08
 
 @@@ Start @@@
 .org 0x0
@@ -47,7 +50,7 @@ interrupt_vector:
 .data
 TIME_COUNTER: .word 0x0
 
-@ Vetor de interrupções
+@ Vetor de interrupcoes
 .org 0x100
 
 .text
@@ -139,9 +142,6 @@ SET_TZIC:
 
     @instrucao msr - habilita interrupcoes
     msr  CPSR_c, #0x13       @ SUPERVISOR mode, IRQ/FIQ enabled
-
-laco:
-    b laco
 
 IRQ_HANDLER:
     stmfd sp!, {r4-r11, lr}
