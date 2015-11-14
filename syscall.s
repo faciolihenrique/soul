@@ -38,6 +38,8 @@ SET_MOTOR_SPEED:
 
 .align 4
 GET_TIME:
+    ldr r1, =TIME_COUNTER
+    mov r0, [r1]
 
 .align 4
 SET_TIME:
