@@ -36,15 +36,24 @@ REG_PROX_CALLBACK:
 .align 4
 SET_MOTOR_SPEED:
 
+
+@passa a posicao de memoria do contador e a carrega em r0
 .align 4
 GET_TIME:
+    stmfd sp!, {r4-r11, lr}
     ldr r1, =TIME_COUNTER
     mov r0, [r1]
+    ldmfd sp!, {r4-r11, lr}
+    movs pc, lr
 
+@pega o conteudo de r0, parametro, e coloca no tempo    
 .align 4
 SET_TIME:
+    stmfd sp!, {r4-r11, lr}
     ldr r1, =TIME_COUNTER
     str r0, [r1]
+    ldmfd sp!, {r4-r11, lr}
+    movs pc, lr
 
 
 .align 4
