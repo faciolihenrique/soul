@@ -31,10 +31,10 @@ READ_SONAR:
 REG_PROX_CALLBACK:
 
 .align 4
-REG_PROX_CALLBACK:
+SET_MOTOR_SPEED:
 
 .align 4
-SET_MOTOR_SPEED:
+SET_MOTORS_SPEED:
 
 
 @passa a posicao de memoria do contador e a carrega em r0
@@ -46,7 +46,7 @@ GET_TIME:
     ldmfd sp!, {r4-r11, lr}
     movs pc, lr
 
-@pega o conteudo de r0, parametro, e coloca no tempo    
+@pega o conteudo de r0, parametro, e coloca no tempo
 .align 4
 SET_TIME:
     stmfd sp!, {r4-r11, lr}
