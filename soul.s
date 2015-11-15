@@ -143,6 +143,13 @@ SET_TZIC:
     @instrucao msr - habilita interrupcoes
     msr  CPSR_c, #0x13       @ SUPERVISOR mode, IRQ/FIQ enabled
 
+SET_GPIO:
+    
+    @ escreve o binario no registrador do GPIO para definir o que e entrada e saida
+    ldr r0, =GPIO_BASE
+    ldr r1, =0b01111100000000000011111111111111
+    str r1, [r0, #GPIO_GDIR]
+
 IRQ_HANDLER:
     stmfd sp!, {r4-r11, lr}
 
