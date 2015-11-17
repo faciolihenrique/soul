@@ -38,7 +38,7 @@ _start:
 interrupt_vector:
     b RESET_HANDLER
 
-@Syscall
+Software Interrupt
 .org 0x08
     b SYSCALL
 
@@ -147,7 +147,7 @@ SET_GPIO:
 
     @ escreve o binario no registrador do GPIO para definir o que e entrada e saida
     ldr r0, =GPIO_BASE
-    ldr r1, =0b01111100000000000011111111111111
+    ldr r1, =0b11111111111111000000000000111110
     str r1, [r0, #GPIO_GDIR]
 
 IRQ_HANDLER:

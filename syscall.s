@@ -1,33 +1,9 @@
 .global SYSCALL
 
 .align 4
-SYSCALL:
-    cmp r7, #16
-    beq SYS_READ_SONAR
-
-    cmp r7, #17
-    beq SYS_REG_PROX_CALLBACK
-
-    cmp r7, #18
-    beq SYS_SET_MOTOR_SPEED
-
-    cmp r7, #19
-    beq SYS_SET_MOTORS_SPEED
-
-    cmp r7, #20
-    beq SYS_GET_TIME
-
-    cmp r7, #21
-    beq SYS_SET_TIME
-
-    cmp r7, #22
-    beq SYS_SET_ALARM
-
-
-.align 4
 SYS_READ_SONAR:
     stmfd sp!, {r4-r11, lr}
-    ldr r3, =GPIO_BASE
+    ldr r5, =GPIO_BASE
 
     @ Verifica se o valor passado é valido
     cmp r0, #0
@@ -35,17 +11,17 @@ SYS_READ_SONAR:
     cmp r0, #16
     bge erro_sonar
 
-
     @ Faz um clear dos bits do sonar, do trigger e do  no GDIR
-    ldr r2, [r3, #GPIO_GDIR]
-    bic r2, r2, #0b00000000000000000000000000111110
+    ldr r2, [r5, #GPIO_DR]
+    bic r2, r2,  #0b00000000000000000000000000111111
 
     @ Sonar_mux <= sonar_id
+    @ r0 contem o sonar desejado
     @ Shifta os bits até a posicao [6]
     @ Faz um E com o r2
 
     ldr r1, =0x0
-    lsl r1, [r0, #5]
+    lsl r1, [r0, #2]
     orr r2, r1, r2
 
     @ Delay de 15ms
@@ -53,11 +29,11 @@ SYS_READ_SONAR:
     ldr r0, [r1]
     add r0, #15
 delay1:
-    ldr r1, [r1]
-    cmp r0, r1
+    ldr r4, [r1]
+    cmp r0, r4
     bge delay1
 
-    @ Faz um E com r2 e 2 para setar o trigger = 1
+    @ Faz um OR com r2 e 2 para setar o trigger = 1
     orr r2, r2, #0x02
 
     @ Delay de 15ms
@@ -65,8 +41,8 @@ delay1:
     ldr r0, [r1]
     add r0, #15
 delay2:
-    ldr r1, [r1]
-    cmp r0, r1
+    ldr r4, [r1]
+    cmp r0, r4
     bge delay2
 
     @ Desativa o trigger
@@ -74,13 +50,15 @@ delay2:
 
 read_sonar_loop:
     @ Delay 10 ms
+    @ FALTA O DELAY
     @ Faz um check da flag (que esta em psr)
-    ldr r1, [r3, #GPIO_PSR]
+    ldr r1, [r5, #GPIO_PSR]
     @ Falta fazer um check desse 1 :)
-    bic r2, r1, #0x01
-    beq r2, #0x01
+    bic r2, r1, #0b11111111111111111111111111111110
+    cmp r2, #0x01
+    beq read_sonar_loop
 
-    @ Armazena os valores da leitura do sonar
+    @ Pega os valores da leitura do sonar
     bic r2, r1, #0b11111111111111110000000000111111
     lsr r2, [r2, #6]
 
@@ -127,6 +105,8 @@ SYS_SET_MOTORS_SPEED:
 
     b END
 
+.align 4
+SYS_REG_PROX_CALLBACK:
 
 @ Retorna o valor do tempo do sistema
 .align 4
