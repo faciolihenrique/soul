@@ -75,6 +75,55 @@ SYS_REG_PROX_CALLBACK:
 
 .align 4
 SYS_SET_MOTOR_SPEED:
+    stmfd sp!, {r4-r11. lr}
+    
+    @move o valor passado de r0 para r2, ja que esse reg sera usado para o retorno
+    mov r2, r0
+    
+    @faz as comparacoes para saber se os numeros passados sao validos
+    cmp r0, #1
+    mov r0, #-1
+    bgt END
+    
+    cmp r0, #0
+    mov r0, #-1
+    blt END
+
+    cmp r1, #63
+    mov r0, #-2
+    bgt END
+
+    cmp r1, #0
+    mov r0, #-2
+    bgt END
+
+    @compara para saber em qual motor vai colocar a velocidade
+    cmp r2, #0
+    beq write_motor_0
+    ldr r5, =GPIO_BASE
+    mov r3, #0
+    add r3, r3, r1, lsl #26
+    ldr r4, [r5, GPIO_DR]
+    bic r4, r4, #0b00000000000000000000000000111111
+    orr r4, r4, r3
+    str r4, [r5, GPIO_DR]
+    mov r0, #0
+
+    b END
+
+@ficou porco e repetindo codigo, mas foi o primeiro jeito que eu pensei    
+write_motor_0:
+    
+    ldr r5, =GPIO_BASE
+    mov r3, #0
+    add r3, r3, r1, lsl #19
+    ldr r4, [r5, GPIO_DR]
+    bic r4, r4, #0b00000000000000000001111110000000
+    orr r4, r4, r3
+    str r4, [r5, GPIO_DR]
+    mov r0, #0
+
+    b END
 
 .align 4
 SYS_SET_MOTORS_SPEED:
@@ -100,7 +149,7 @@ SYS_SET_MOTORS_SPEED:
 
     @passa endereco armazenar nos dados
     ldr r5 =GPIO_BASE
-    ldr r4, [r4, GPIO_DR]
+    ldr r4, [r5, GPIO_DR]
     bic r4, r4, #0b00000000000000000001111110111111
     orr r4, r4, r3
     str r4, [r5, GPIO_DR]
