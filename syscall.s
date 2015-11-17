@@ -57,6 +57,7 @@ SET_MOTORS_SPEED:
     @passa endereco armazenar nos dados
     ldr r4, =GPIO_BASE  
     str r3, [r4]
+    mov r0, #0
 
 END:
     ldmfd sp!, {r4-r11, lr}
