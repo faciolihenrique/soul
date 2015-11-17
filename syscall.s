@@ -46,14 +46,31 @@ SYS_READ_SONAR:
 
     ldr r1, =0x0
     lsl r1, [r0, #5]
-    and r2, r1, r2
-    @ ESTOU COM PROBLEMA PARA CONTAR O TEMPO (15ms)
-    @ Faz um E com r2 e 2 para setar o trigger = 1
-    and r2, r2, #0x02
+    orr r2, r1, r2
 
-    @ Deveria esperar 15 ms
+    @ Delay de 15ms
+    ldr r1, =TIME_COUNTER
+    ldr r0, [r1]
+    add r0, #15
+delay1:
+    ldr r1, [r1]
+    cmp r0, r1
+    bge delay1
+
+    @ Faz um E com r2 e 2 para setar o trigger = 1
+    orr r2, r2, #0x02
+
+    @ Delay de 15ms
+    ldr r1, =TIME_COUNTER
+    ldr r0, [r1]
+    add r0, #15
+delay2:
+    ldr r1, [r1]
+    cmp r0, r1
+    bge delay2
+
     @ Desativa o trigger
-    eor r2, r2, #0x02
+    bic r2, r2, #0x02
 
 read_sonar_loop:
     @ Delay 10 ms
@@ -64,7 +81,7 @@ read_sonar_loop:
     beq r2, #0x01
 
     @ Armazena os valores da leitura do sonar
-    bic r2, r1, #0b00000000000000011111111111000000
+    bic r2, r1, #0b11111111111111110000000000111111
     lsr r2, [r2, #6]
 
     mov r0, r2

@@ -56,25 +56,25 @@ TIME_COUNTER: .word 0x0
 .text
 SYSCALL:
     cmp r7, #16
-    beq READ_SONAR
+    beq SYS_READ_SONAR
 
     cmp r7, #17
-    beq REG_PROX_CALLBACK
-    
+    beq SYS_REG_PROX_CALLBACK
+
     cmp r7, #18
-    beq SET_MOTOR_SPEED
+    beq SYS_SET_MOTOR_SPEED
 
     cmp r7, #19
-    beq SET_MOTORS_SPEED
+    beq SYS_SET_MOTORS_SPEED
 
     cmp r7, #20
-    beq GET_TIME
+    beq SYS_GET_TIME
 
     cmp r7, #21
-    beq SET_TIME
+    beq SYS_SET_TIME
 
     cmp r7, #22
-    beq SET_ALARM
+    beq SYS_SET_ALARM
 
 RESET_HANDLER:
     @ Zera o contador
@@ -144,7 +144,7 @@ SET_TZIC:
     msr  CPSR_c, #0x13       @ SUPERVISOR mode, IRQ/FIQ enabled
 
 SET_GPIO:
-    
+
     @ escreve o binario no registrador do GPIO para definir o que e entrada e saida
     ldr r0, =GPIO_BASE
     ldr r1, =0b01111100000000000011111111111111
