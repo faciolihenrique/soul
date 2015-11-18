@@ -162,9 +162,9 @@ SYS_SET_MOTORS_SPEED:
     add r3, r3, r2,lsl #19
 
     @passa endereco armazenar nos dados
-    ldr r5 =GPIO_BASE
+    ldr r5, =GPIO_BASE
     ldr r4, [r5, #GPIO_DR]
-    bic r4, r4, DR_MOTORS
+    bic r4, r4, #DR_MOTORS
     orr r4, r4, r3
     str r4, [r5, #GPIO_DR]
     mov r0, #0
