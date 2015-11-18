@@ -83,7 +83,7 @@ SYS_READ_SONAR:
         bne read_sonar_loop
 
     @ Pega os valores da leitura do sonar
-    bic r0, r1, #0b11111111111111110000000000111111
+    mov r0, r1, bic #0b11111111111111110000000000111111
     mov r0, r0, lsr #6
 
     b END
