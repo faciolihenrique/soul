@@ -81,7 +81,8 @@ SYS_READ_SONAR:
         @ Faz um check da flag (que esta em psr)
         @ Verifica se o valor do flag está 1
         ldr r1, [r5, #GPIO_PSR]
-        bic r2, r1, #PSR_FLAG
+        ldr r6, =PSR_FLAG
+        bic r2, r1, r6
         cmp r2, #0x01
         bne read_sonar_loop
 
