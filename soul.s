@@ -18,7 +18,7 @@ interrupt_vector:
 
 .data
 @ Periféricos com clock de 107KHz
-TIME_COUNTER: .word 107
+TIME_COUNTER: .word 0x0
 
 @ Vetor de interrupcoes
 .org 0x100
@@ -48,7 +48,7 @@ SVC_HANDLER:
 
 RESET_HANDLER:
     @ Zera o contador
-    ldr r2, =CONTADOR  @lembre-se de declarar esse contador em uma secao de dados!
+    ldr r2, =TIME_COUNTER
     mov r0,#0
     str r0,[r2]
 
@@ -65,6 +65,7 @@ RESET_HANDLER:
 .set GPT_IR,                0x0C
 .set GPT_OCR1,              0x10
 .set GPT_CR_VALUE,          0x00000041
+.set TIME_SZ                107
 
 @ Código GPT
 SET_GPT:
