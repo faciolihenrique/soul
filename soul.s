@@ -7,7 +7,7 @@ _start:
 interrupt_vector:
     b RESET_HANDLER
 
-Software Interrupt
+@Software Interrupt
 .org 0x08
     b SVC_HANDLER
 

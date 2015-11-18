@@ -1,6 +1,6 @@
 @ Lab Constants
 .set MAX_ALARMS,            0x08
-.set MAX_CALLBACKS          0x08
+.set MAX_CALLBACKS,         0x08
 
 .data
 N_ALARMS: .word 0x0
@@ -35,7 +35,7 @@ SYS_READ_SONAR:
     @ Shifta os bits até a posicao [6]
     @ Faz um E com o r2
     ldr r1, =0x0
-    lsl r1, [r0, #2]
+    mov r1, lsl r0 #2
     orr r2, r1, r2
     str r2, [r5, #GPIO_DR]
 
@@ -118,20 +118,20 @@ SYS_SET_MOTOR_SPEED:
 
     @ Prepara para colocar as informações no motor
     ldr r5, =GPIO_BASE
-    ldr r4, [r5, GPIO_DR]
+    ldr r4, [r5, #GPIO_DR]
     mov r3, #0
 
     @ Caso o motor seja o 0
     addeq r3, r3, r1, lsl #26
     biceq r4, r4, #0b00000000000000000000000000111111
     orreq r4, r4, r3
-    streq r4, [r5, GPIO_DR]
+    streq r4, [r5, #GPIO_DR]
 
     @ Caso o motor seja o 1
     addgt r3, r3, r1, lsl #19
     bicgt r4, r4, #0b00000000000000000001111110000000
     orrgt r4, r4, r3
-    strgt r4, [r5, GPIO_DR]
+    strgt r4, [r5, #GPIO_DR]
 
     mov r0, #0
     b END
@@ -167,9 +167,6 @@ SYS_SET_MOTORS_SPEED:
     mov r0, #0
 
     b END
-
-.align 4
-SYS_REG_PROX_CALLBACK:
 
 @ Retorna o valor do tempo do sistema
 .align 4
