@@ -1,34 +1,3 @@
-@@@ All teh sets @@@
-@ System time
-.set TIME_SZ,               200000
-
-@ GPT Constants
-.set GPT_BASE,              0x53FA0000
-.set GPT_CR,                0x00
-.set GPT_PR,                0x04
-.set GPT_SR,                0x08
-.set GPT_IR,                0x0C
-.set GPT_OCR1,              0x10
-.set GPT_CR_VALUE,          0x00000041
-
-@ TZIC Constants
-.set TZIC_BASE,             0x0FFFC000
-.set TZIC_INTCTRL,          0x0
-.set TZIC_INTSEC1,          0x84
-.set TZIC_ENSET1,           0x104
-.set TZIC_PRIOMASK,         0xC
-.set TZIC_PRIORITY9,        0x424
-
-@ GPIO Definition
-.set GPIO_BASE,             0x53F84000
-.set GPIO_DR,               0x00
-.set GPIO_GDIR,             0x04
-.set GPIO_PSR,              0x08
-
-@ Lab Constants
-.set MAX_ALARMS,            0x08
-.set MAX_CALLBACKS          0x08
-
 @@@ Start @@@
 .org 0x0
 .section .iv,"a"
@@ -40,7 +9,7 @@ interrupt_vector:
 
 Software Interrupt
 .org 0x08
-    b SYSCALL
+    b SVC_HANDLER
 
 
 .org 0x18
@@ -48,13 +17,14 @@ Software Interrupt
 
 
 .data
-TIME_COUNTER: .word 0x0
+@ Periféricos com clock de 107KHz
+TIME_COUNTER: .word 107
 
 @ Vetor de interrupcoes
 .org 0x100
 
 .text
-SYSCALL:
+SVC_HANDLER:
     cmp r7, #16
     beq SYS_READ_SONAR
 
@@ -87,6 +57,16 @@ RESET_HANDLER:
     mcr p15, 0, r0, c12, c0, 0
 
 
+@ GPT Constants
+.set GPT_BASE,              0x53FA0000
+.set GPT_CR,                0x00
+.set GPT_PR,                0x04
+.set GPT_SR,                0x08
+.set GPT_IR,                0x0C
+.set GPT_OCR1,              0x10
+.set GPT_CR_VALUE,          0x00000041
+
+@ Código GPT
 SET_GPT:
     @Send data do GPT hardware
     @ Load the first adress of GPT on r1
@@ -99,8 +79,7 @@ SET_GPT:
     ldr r0, =0
     str r0, [r1, #GPT_PR]
 
-    @ Value to compare, this is incremented all the cycles of the processor
-    @ as the processor clock is 200MHz, we shoul compare to 200*10^6 to 1s
+    @ Gera interrupções a cada 2*10^5 ciclos
     ldr r0, =TIME_SZ
     str r0, [r1, #GPT_OCR1]
 
@@ -108,6 +87,14 @@ SET_GPT:
     ldr r0, =1
     str r0, [r1, #GPT_IR]
 
+
+@ TZIC Constants
+.set TZIC_BASE,             0x0FFFC000
+.set TZIC_INTCTRL,          0x0
+.set TZIC_INTSEC1,          0x84
+.set TZIC_ENSET1,           0x104
+.set TZIC_PRIOMASK,         0xC
+.set TZIC_PRIORITY9,        0x424
 
 @ Código TZIC
 SET_TZIC:
@@ -143,6 +130,14 @@ SET_TZIC:
     @instrucao msr - habilita interrupcoes
     msr  CPSR_c, #0x13       @ SUPERVISOR mode, IRQ/FIQ enabled
 
+
+@ GPIO Definition
+.set GPIO_BASE,             0x53F84000
+.set GPIO_DR,               0x00
+.set GPIO_GDIR,             0x04
+.set GPIO_PSR,              0x08
+
+@ Faz a definição de entrada e saida do GPIO_GDIR
 SET_GPIO:
 
     @ escreve o binario no registrador do GPIO para definir o que e entrada e saida
@@ -150,6 +145,8 @@ SET_GPIO:
     ldr r1, =0b11111111111111000000000000111110
     str r1, [r0, #GPIO_GDIR]
 
+
+@ Implementação o IRQ_HANDLER (Gerenciador de interrupções de hardware)
 IRQ_HANDLER:
     stmfd sp!, {r4-r11, lr}
 
