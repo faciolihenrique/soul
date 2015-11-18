@@ -1,6 +1,8 @@
 @ Lab Constants
 .set MAX_ALARMS,            0x08
 .set MAX_CALLBACKS,         0x08
+.set PSR_CHECK,             0b11111111111111110000000000111111
+.set DR_MOTORS,             0b00000000000000000001111110111111
 
 .data
 N_ALARMS: .word 0x0
@@ -78,12 +80,12 @@ SYS_READ_SONAR:
         @ Faz um check da flag (que esta em psr)
         @ Verifica se o valor do flag está 1
         ldr r1, [r5, #GPIO_PSR]
-        bic r2, r1, #0b11111111111111111111111111111110
+        bic r2, r1, PSR_CHECK
         cmp r2, #0x01
         bne read_sonar_loop
 
     @ Pega os valores da leitura do sonar
-    mov r0, r1, bic #0b11111111111111110000000000111111
+    bic r0, r1,
     mov r0, r0, lsr #6
 
     b END
@@ -159,9 +161,9 @@ SYS_SET_MOTORS_SPEED:
     add r3, r3, r2,lsl #19
 
     @passa endereco armazenar nos dados
-    ldr r5, =GPIO_BASE
+    ldr r5 =GPIO_BASE
     ldr r4, [r5, #GPIO_DR]
-    bic r4, r4, #0b00000000000000000001111110111111
+    bic r4, r4, DR_MOTORS
     orr r4, r4, r3
     str r4, [r5, #GPIO_DR]
     mov r0, #0
