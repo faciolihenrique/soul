@@ -99,7 +99,7 @@ SYS_REG_PROX_CALLBACK:
 
 .align 4
 SYS_SET_MOTOR_SPEED:
-    stmfd sp!, {r4-r11. lr}
+    stmfd sp!, {r4-r11, lr}
 
     @ Verifica se os parametros passados são válidos
     @ velocidades
@@ -140,7 +140,7 @@ SYS_SET_MOTOR_SPEED:
 .align 4
 SYS_SET_MOTORS_SPEED:
 
-    stmfd sp!, {r4-r11. lr}
+    stmfd sp!, {r4-r11, lr}
 
     @compara se é um valor valido de velocidade
     cmp r0, #63
@@ -160,10 +160,10 @@ SYS_SET_MOTORS_SPEED:
 
     @passa endereco armazenar nos dados
     ldr r5 =GPIO_BASE
-    ldr r4, [r5, GPIO_DR]
+    ldr r4, [r5, #GPIO_DR]
     bic r4, r4, #0b00000000000000000001111110111111
     orr r4, r4, r3
-    str r4, [r5, GPIO_DR]
+    str r4, [r5, #GPIO_DR]
     mov r0, #0
 
     b END
@@ -174,7 +174,7 @@ SYS_GET_TIME:
     stmfd sp!, {r4-r11, lr}
     @ Passa a posicao de memoria do contador e a carrega em r0
     ldr r1, =TIME_COUNTER
-    mov r0, [r1]
+    ldr r0, [r1]
 
     b END
 
@@ -202,7 +202,7 @@ SYS_SET_ALARM:
 
 
 erro_alarm:
-    mv r0, #-1
+    mov r0, #-1
 
 END:
     ldmfd sp!, {r4-r11, lr}
