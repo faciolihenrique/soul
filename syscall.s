@@ -35,7 +35,7 @@ SYS_READ_SONAR:
     @ Shifta os bits até a posicao [6]
     @ Faz um E com o r2
     ldr r1, =0x0
-    mov r1, lsl r0 #2
+    mov r1, r0, lsl #2
     orr r2, r1, r2
     str r2, [r5, #GPIO_DR]
 
@@ -84,7 +84,7 @@ SYS_READ_SONAR:
 
     @ Pega os valores da leitura do sonar
     bic r0, r1, #0b11111111111111110000000000111111
-    lsr r0, [r0, #6]
+    mov r0, r0, lsr #6
 
     b END
 
@@ -153,10 +153,10 @@ SYS_SET_MOTORS_SPEED:
 
     @coloca o valor de r2 na posicao de memoria correspondente do motor r0
     mov r3, #0
-    @desloca o valor 7 bits, para cair na faixa do motor 0, com 0 no valor de write (talvez bit de write)
+    @desloca o valor 26 bits, para cair na faixa do motor 0, com 0 no valor de write (talvez bit de write)
     add r3, r3, r1,lsl #26
     @soma o valor de r1, que ja vai ficar no local correto
-    add r3, r3, r2, #19
+    add r3, r3, r2,lsl #19
 
     @passa endereco armazenar nos dados
     ldr r5 =GPIO_BASE
