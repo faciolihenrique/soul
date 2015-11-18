@@ -1,8 +1,9 @@
 @ Lab Constants
 .set MAX_ALARMS,            0x08
 .set MAX_CALLBACKS,         0x08
-.set PSR_CHECK,             0b11111111111111110000000000111111
+.set PSR_READ_SONARS,       0b11111111111111110000000000111111
 .set DR_MOTORS,             0b00000000000000000001111110111111
+.set PSR_FLAG,              0b00000000000000000000000000000001
 
 .data
 N_ALARMS: .word 0x0
@@ -80,12 +81,12 @@ SYS_READ_SONAR:
         @ Faz um check da flag (que esta em psr)
         @ Verifica se o valor do flag está 1
         ldr r1, [r5, #GPIO_PSR]
-        bic r2, r1, PSR_CHECK
+        bic r2, r1, #PSR_FLAG
         cmp r2, #0x01
         bne read_sonar_loop
 
     @ Pega os valores da leitura do sonar
-    bic r0, r1,
+    bic r0, r1, #PSR_READ_SONARS
     mov r0, r0, lsr #6
 
     b END
