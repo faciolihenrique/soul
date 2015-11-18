@@ -166,7 +166,7 @@ SYS_SET_MOTORS_SPEED:
     ldr r5, =GPIO_BASE
     ldr r4, [r5, #GPIO_DR]
     ldr r6, =DR_MOTORS
-    bic r4, r4, [r6]
+    bic r4, r4, r6
     orr r4, r4, r3
     str r4, [r5, #GPIO_DR]
     mov r0, #0
