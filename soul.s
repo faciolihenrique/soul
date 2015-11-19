@@ -157,6 +157,21 @@ IRQ_HANDLER:
     add r0, r0, #0x1                @increment in 1 TIME_COUNTER
     str r0, [r2]                    @store it in the r2 adress
 
+    @ Percorre o vetor de callbacks
+    @ JUST DO IT!
+    @1o - Percorre o vetor dos sonares a serem chamados, invocando a syscall read_sonar toda vez.
+    @2o - Analisa o valor retornado pela syscall. Deu certo?
+    @   Não - Continua percorrendo o vetor
+    @   Sim - UEPA, pega e executa essa executa a função. PROBLEMA= Como executar essa função em modo usuario e depois que ela parar, voltar ao modo supervisor...?
+    @Pronto :)
+
+    @ Percorre o vetor de alarmes
+    @ DO IT
+    @1o - Percorre o vetor de tempos, comparando se ja passou o tempo indicado para chamar a função. Ja deu o tempo?
+    @   Não - Continua percorrendo o vetor
+    @   Sim - UEPA, pega e executa essa executa a função. PROBLEMA= Como executar essa função em modo usuario e depois que ela parar, voltar ao modo supervisor...?
+    @Pronto :)
+
     ldmfd sp!, {r4-r11, lr}
 
     @ Subtract lr of 4
