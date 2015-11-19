@@ -11,10 +11,10 @@ N_CALLBACKS: .word 0x0
 SHIFT_CALLBACKS: .word 0x0
 
 @criei esses vetores para guardar os valores das callbacks. ponteiros, limiares e identificadores
-ALARMS_VECTOR:
-CALLBACK_ID_VECTOR: 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
-CALLBACK_DIST_VECTOR: 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
-CALLBACK_POITERS_VECTOR: 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
+ALARMS_VECTOR: .fill 4*MAX_ALARMS
+CALLBACK_ID_VECTOR: .fill 4*MAX_CALLBACKS
+CALLBACK_DIST_VECTOR: .fill 4*MAX_CALLBACKS
+CALLBACK_POITERS_VECTOR: .fill 4*MAX_CALLBACKS
 
 .text
 
@@ -107,47 +107,45 @@ erro_sonar:
 .align 4
 SYS_REG_PROX_CALLBACK:
     stmfd sp!, {r4-r11, lr}
-   
+
     @testa as condicoes de callbacks, registradores validos
     ldr r4, =N_CALLBACKS
-    mov r4, [r4]
-    cmp r4, MAX_CALLBACKS
-    mov r0, #-1
+    ldr r4, [r4]
+    cmp r4, #MAX_CALLBACKS
+    movgt r0, #-1
     bgt END
 
-    mov r10, r0
     cmp r2, #15
-    mov r0, #-2 
+    movgt r0, #-2
     bgt END
-    
+
     cmp r2, #0
-    mov r0, #-2
+    movlt r0, #-2
     blt END
-    
+
     @carrega as posicoes que o comeco dos vetores estao na memoria
     ldr r3, =CALLBACK_ID_VECTOR
     ldr r4, =CALLBACK_DIST_VECTOR
     ldr r5, =CALLBACK_POITERS_VECTOR
-    
+
     @salva o que foi passado pelo usuario, nas posicoes correspondentes de cada vetor
-    str r0, [r3, SHIFT_CALLBACKS]
-    str r1, [r4, SHIFT_CALLBACKS]
-    str r2, [r5, SHIFT_CALLBACKS]
-    
+    str r0, [r3, #SHIFT_CALLBACKS]
+    str r1, [r4, #SHIFT_CALLBACKS]
+    str r2, [r5, #SHIFT_CALLBACKS]
+
     @coloca valor de retorno no r0
     mov r0, #0
-    
+
     @adiciona valor para colocar valores nas posicoes corretas dos vetores
+    @guarda novo valor do regitrador para deslocamento
     ldr r2, =SHIFT_CALLBACKS
-    mov r1, [r2]
+    ldr r1, [r2]
     add r1, r1, #4
-    
-    @guarda novo valor so regitrador para deslocamento
     str r1, [r2]
-    
+
     @adiciona o contador de syscalls para posterior conferencia
     ldr r1, =N_SYSCALLS
-    mov r2, [r1]
+    ldr r2, [r1]
     add r2, r2, #1
     str r2, [r1]
 
@@ -191,7 +189,7 @@ SYS_SET_MOTOR_SPEED:
 
     mov r0, #0
     b END
-
+syscall
 
 .align 4
 SYS_SET_MOTORS_SPEED:

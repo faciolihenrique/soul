@@ -25,6 +25,8 @@ TIME_COUNTER: .word 0x0
 
 .text
 SVC_HANDLER:
+    stmfd sp!, {lr}
+
     cmp r7, #16
     beq SYS_READ_SONAR
 
@@ -45,6 +47,10 @@ SVC_HANDLER:
 
     cmp r7, #22
     beq SYS_SET_ALARM
+
+    ldmfd sp!, {r4-r11, lr}
+    movs pc, lr
+
 
 RESET_HANDLER:
     @ Zera o contador
