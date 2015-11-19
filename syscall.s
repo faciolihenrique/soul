@@ -144,6 +144,12 @@ SYS_REG_PROX_CALLBACK:
     
     @guarda novo valor so regitrador para deslocamento
     str r1, [r2]
+    
+    @adiciona o contador de syscalls para posterior conferencia
+    ldr r1, =N_SYSCALLS
+    mov r2, [r1]
+    add r2, r2, #1
+    str r2, [r1]
 
     b END
 
