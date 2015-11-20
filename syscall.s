@@ -6,15 +6,18 @@
 .set PSR_FLAG,              0b00000000000000000000000000000001
 
 .data
-N_ALARMS: .word 0x0
 N_CALLBACKS: .word 0x0
 SHIFT_CALLBACKS: .word 0x0
 
 @criei esses vetores para guardar os valores das callbacks. ponteiros, limiares e identificadores
-ALARMS_VECTOR: .fill 4*MAX_ALARMS
 CALLBACK_ID_VECTOR: .fill 4*MAX_CALLBACKS
 CALLBACK_DIST_VECTOR: .fill 4*MAX_CALLBACKS
 CALLBACK_POITERS_VECTOR: .fill 4*MAX_CALLBACKS
+
+@ Vetores que armazenas um ponteriro para uma função e o tempo que deve ser executado
+N_ALARMS: .word 0x0
+ALARMS_TIMER: .fill 4*MAX_ALARMS, -1
+ALARMS_FUNCTIONS: .fill 4*MAX_ALARMS
 
 .text
 
@@ -27,6 +30,7 @@ CALLBACK_POITERS_VECTOR: .fill 4*MAX_CALLBACKS
 SYS_READ_SONAR:
 
     stmfd sp!, {r4-r11, lr}
+
     @ Carrega a base do GPIO
     ldr r5, =GPIO_BASE
 
@@ -36,7 +40,7 @@ SYS_READ_SONAR:
     cmp r0, #16
     bge erro_sonar
 
-    @ Faz um clear dos bits do sonar, do trigger e do  no GDIR
+    @ Faz um clear dos bits do sonar, do trigger e do FLAG no GDIR
     ldr r2, [r5, #GPIO_DR]
     bic r2, r2,  #0b00000000000000000000000000111111
 
@@ -248,17 +252,44 @@ SYS_SET_ALARM:
 
     stmfd sp!, {r4-r11, lr}
 
-    @ Primeiramente lê o número de alarmes já criados para saber em que posição colocar o próximo
+    @ Verifica se o valor de tempo passado é válido
+    ldr r2, =TIME_COUNTER
+    ldr r2, [r2]
+    cmp r1, r2
+    ldrle r0, #-2
+    ble END
+
+    @ Lê o número de alarmes já criados para saber em que posição colocar o próximo
     ldr r2, =N_ALARMS
     ldr r3, [r2]
     cmp r3, #8
-    bgt erro_alarm
+    movgt r0, #-1
+    bgt END
+
+    @ Passou, então já incrementa o N_ALARMS
+    add r3, r3, #1
+    str r3, [r2]
+
+    @ Como existem lugares a serem alocados no vetor, ele procura esse lugar no vetor do tempo (A primeira posição que possuir -1)
+    ldr r2, =ALARMS_TIMER
+    ldr r3, =#0x0
+    search_loop:
+        ldr r4, [r2, r3]
+        cmp r4, #-1
+        addne r3, r3, #0x04
+        cmp r3, r3
+        bne search_loop
+
+    @ Saindo do loop, a posição [r2,r3] contem a posição que deve ser colocada nos vetores
+    @ Insere no vetor de tempo
+    ldr r1, [r2,r3]
+    @ Insere no vetor de função
+    ldr r2, =ALARMS_FUNCTIONS
+    ldr r0, [r2, r3]
 
 
 
-erro_alarm:
-    mov r0, #-1
 
 END:
     ldmfd sp!, {r4-r11, lr}
-    movs pc, lr
+    mov pc, lr

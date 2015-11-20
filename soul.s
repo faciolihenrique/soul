@@ -28,27 +28,27 @@ SVC_HANDLER:
     stmfd sp!, {lr}
 
     cmp r7, #16
-    beq SYS_READ_SONAR
+    bleq SYS_READ_SONAR
 
     cmp r7, #17
-    beq SYS_REG_PROX_CALLBACK
+    bleq SYS_REG_PROX_CALLBACK
 
     cmp r7, #18
-    beq SYS_SET_MOTOR_SPEED
+    bleq SYS_SET_MOTOR_SPEED
 
     cmp r7, #19
-    beq SYS_SET_MOTORS_SPEED
+    bleq SYS_SET_MOTORS_SPEED
 
     cmp r7, #20
-    beq SYS_GET_TIME
+    bleq SYS_GET_TIME
 
     cmp r7, #21
-    beq SYS_SET_TIME
+    bleq SYS_SET_TIME
 
     cmp r7, #22
-    beq SYS_SET_ALARM
+    bleq SYS_SET_ALARM
 
-    ldmfd sp!, {r4-r11, lr}
+    ldmfd sp!, {lr}
     movs pc, lr
 
 
@@ -71,7 +71,7 @@ RESET_HANDLER:
 .set GPT_IR,                0x0C
 .set GPT_OCR1,              0x10
 .set GPT_CR_VALUE,          0x00000041
-.set TIME_SZ                107
+.set TIME_SZ,               107
 
 @ Código GPT
 SET_GPT:
@@ -165,18 +165,37 @@ IRQ_HANDLER:
 
     @ Percorre o vetor de callbacks
     @ JUST DO IT!
-    @1o - Percorre o vetor dos sonares a serem chamados, invocando a syscall read_sonar toda vez.
-    @2o - Analisa o valor retornado pela syscall. Deu certo?
+    @ 1o - Percorre o vetor dos sonares a serem chamados, invocando a syscall read_sonar
+    @ 2o - Analisa o valor retornado pela syscall. Deu certo?
     @   Não - Continua percorrendo o vetor
     @   Sim - UEPA, pega e executa essa executa a função. PROBLEMA= Como executar essa função em modo usuario e depois que ela parar, voltar ao modo supervisor...?
     @Pronto :)
 
     @ Percorre o vetor de alarmes
     @ DO IT
-    @1o - Percorre o vetor de tempos, comparando se ja passou o tempo indicado para chamar a função. Ja deu o tempo?
+    @ 1o - Percorre o vetor de tempos, comparando se ja passou o tempo indicado para chamar a função. Ja deu o tempo?
     @   Não - Continua percorrendo o vetor
     @   Sim - UEPA, pega e executa essa executa a função. PROBLEMA= Como executar essa função em modo usuario e depois que ela parar, voltar ao modo supervisor...?
     @Pronto :)
+    ldr r0, =ALARMS_TIMER
+    ldr r1, =ALARMS_FUNCTIONS
+    ldr r2, =TIME_COUNTER
+    ldr r2, [r2]
+    ldr r3, =#0x0
+    ldr r4, =#0x0
+
+    loop:
+        cmp r4, #MAX_ALARMS
+        bge end
+        ldr r5, [r0, r3]
+        cmp r6, r2
+        ldrge r6, [r1, r3]
+        bxge r6
+        add r4, r4 #0x01
+        b loop
+
+
+    end_alarms:
 
     ldmfd sp!, {r4-r11, lr}
 
