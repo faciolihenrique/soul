@@ -27,6 +27,9 @@ TIME_COUNTER: .word 0x0
 SVC_HANDLER:
     stmfd sp!, {lr}
 
+    @ Muda o modo de operação para supervisor
+    msr CPSR_c, #0xD3
+
     cmp r7, #16
     bleq SYS_READ_SONAR
 
@@ -76,9 +79,9 @@ RESET_HANDLER:
 @ Código GPT
 SET_GPT:
     @Send data do GPT hardware
-    @ Load the first adress of GPT on r1
     ldr	r1, =GPT_BASE
 
+    @ Habilita o GPT
     ldr r0, =GPT_CR_VALUE
     str	r0, [r1, #GPT_CR]
 
@@ -138,6 +141,7 @@ SET_TZIC:
     msr  CPSR_c, #0x13       @ SUPERVISOR mode, IRQ/FIQ enabled
 
 
+
 @ GPIO Definition
 .set GPIO_BASE,             0x53F84000
 .set GPIO_DR,               0x00
@@ -146,7 +150,6 @@ SET_TZIC:
 
 @ Faz a definição de entrada e saida do GPIO_GDIR
 SET_GPIO:
-
     @ escreve o binario no registrador do GPIO para definir o que e entrada e saida
     ldr r0, =GPIO_BASE
     ldr r1, =0b11111111111111000000000000111110
@@ -186,12 +189,12 @@ IRQ_HANDLER:
 
     loop:
         cmp r4, #MAX_ALARMS
-        bge end
+        bge end_alarms
         ldr r5, [r0, r3]
         cmp r6, r2
         ldrge r6, [r1, r3]
         bxge r6
-        add r4, r4 #0x01
+        add r4, r4, #0x01
         b loop
 
 

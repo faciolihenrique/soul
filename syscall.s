@@ -16,7 +16,7 @@ CALLBACK_POITERS_VECTOR: .fill 4*MAX_CALLBACKS
 
 @ Vetores que armazenas um ponteriro para uma função e o tempo que deve ser executado
 N_ALARMS: .word 0x0
-ALARMS_TIMER: .fill 4*MAX_ALARMS, -1
+ALARMS_TIMER: .fill 4*MAX_ALARMS, 0
 ALARMS_FUNCTIONS: .fill 4*MAX_ALARMS
 
 .text
@@ -53,7 +53,13 @@ SYS_READ_SONAR:
     orr r2, r1, r2
     str r2, [r5, #GPIO_DR]
 
-    @ Delay de 15ms
+    @ Delay de 15ms ((107Khz * 1 ms)/3)
+    @ ldr r0, #535
+    @ delay_15
+    @   sub r0, r0, #1
+    @   cmp r0, #0
+    @   bgt delay_15
+
     ldr r1, =TIME_COUNTER
     ldr r0, [r1]
     add r0, #15
@@ -133,22 +139,24 @@ SYS_REG_PROX_CALLBACK:
     ldr r5, =CALLBACK_POITERS_VECTOR
 
     @salva o que foi passado pelo usuario, nas posicoes correspondentes de cada vetor
-    str r0, [r3, #SHIFT_CALLBACKS]
-    str r1, [r4, #SHIFT_CALLBACKS]
-    str r2, [r5, #SHIFT_CALLBACKS]
+    ldr r6, =SHIFT_CALLBACKS
+
+    str r0, [r3, r6]
+    str r1, [r4, r6]
+    str r2, [r5, r6]
 
     @coloca valor de retorno no r0
     mov r0, #0
 
     @adiciona valor para colocar valores nas posicoes corretas dos vetores
     @guarda novo valor do regitrador para deslocamento
-    ldr r2, =SHIFT_CALLBACKS
-    ldr r1, [r2]
-    add r1, r1, #4
-    str r1, [r2]
 
-    @adiciona o contador de syscalls para posterior conferencia
-    ldr r1, =N_SYSCALLS
+    ldr r1, [r6]
+    add r1, r1, #4
+    str r1, [r6]
+
+    @adiciona o contador de callbacks para posterior conferencia
+    ldr r1, =N_CALLBACKS
     ldr r2, [r1]
     add r2, r2, #1
     str r2, [r1]
@@ -193,7 +201,7 @@ SYS_SET_MOTOR_SPEED:
 
     mov r0, #0
     b END
-syscall
+
 
 .align 4
 SYS_SET_MOTORS_SPEED:
@@ -256,7 +264,7 @@ SYS_SET_ALARM:
     ldr r2, =TIME_COUNTER
     ldr r2, [r2]
     cmp r1, r2
-    ldrle r0, #-2
+    ldrle r0, =#-2
     ble END
 
     @ Lê o número de alarmes já criados para saber em que posição colocar o próximo
