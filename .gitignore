@@ -1,8 +1,7 @@
-soul
-soul.o
-loco.*
+*.o
 bico.*
+LOCO.x
+SOUL.x
+disk.img
+bico.s
 
-robot_ctrl
-
-api_robot*
