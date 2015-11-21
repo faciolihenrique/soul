@@ -1,3 +1,38 @@
+@ SVC Constants
+.set MAX_ALARMS,            0x08
+.set MAX_CALLBACKS,         0x08
+.set PSR_READ_SONARS,       0b11111111111111110000000000111111
+.set DR_MOTORS,             0b00000000000000000001111110111111
+.set PSR_FLAG,              0b00000000000000000000000000000001
+
+@ GPT Constants
+.set GPT_BASE,              0x53FA0000
+.set GPT_CR,                0x00
+.set GPT_PR,                0x04
+.set GPT_SR,                0x08
+.set GPT_IR,                0x0C
+.set GPT_OCR1,              0x10
+.set GPT_CR_VALUE,          0x00000041
+.set TIME_SZ,               107
+
+@ TZIC Constants
+.set TZIC_BASE,             0x0FFFC000
+.set TZIC_INTCTRL,          0x0
+.set TZIC_INTSEC1,          0x84
+.set TZIC_ENSET1,           0x104
+.set TZIC_PRIOMASK,         0xC
+.set TZIC_PRIORITY9,        0x424
+
+@ GPIO Definition
+.set GPIO_BASE,             0x53F84000
+.set GPIO_DR,               0x00
+.set GPIO_GDIR,             0x04
+.set GPIO_PSR,              0x08
+
+@ USER
+.set USER_TEXT,             0x77802000
+
+
 @@@ Start @@@
 .org 0x0
 .section .iv,"a"
@@ -20,27 +55,22 @@ interrupt_vector:
 @ Periféricos com clock de 107KHz
 TIME_COUNTER: .word 0x0
 
-@ SVC Constants
-.set MAX_ALARMS,            0x08
-.set MAX_CALLBACKS,         0x08
-.set PSR_READ_SONARS,       0b11111111111111110000000000111111
-.set DR_MOTORS,             0b00000000000000000001111110111111
-.set PSR_FLAG,              0b00000000000000000000000000000001
-
 @ SVC variables
 N_CALLBACKS: .word 0x0
 SHIFT_CALLBACKS: .word 0x0
 
-@criei esses vetores para guardar os valores das callbacks. ponteiros,limiares e identificadores
-
+@ Vetores para guardar os valores das callbacks. ponteiros,limiares e identificadores
 CALLBACK_ID_VECTOR: .fill 4*MAX_CALLBACKS
 CALLBACK_DIST_VECTOR: .fill 4*MAX_CALLBACKS
 CALLBACK_POITERS_VECTOR: .fill 4*MAX_CALLBACKS
+
 @ Vetores que armazenas um ponteriro para uma função e o tempo que deve serexecutado
 N_ALARMS: .word 0x0
 ALARMS_TIMER: .fill 4*MAX_ALARMS, 0
 ALARMS_FUNCTIONS: .fill 4*MAX_ALARMS
 
+
+.text
 @ Vetor de interrupcoes
 .org 0x100
 
@@ -55,17 +85,6 @@ RESET_HANDLER:
     mcr p15, 0, r0, c12, c0, 0
 
 
-@ GPT Constants
-.set GPT_BASE,              0x53FA0000
-.set GPT_CR,                0x00
-.set GPT_PR,                0x04
-.set GPT_SR,                0x08
-.set GPT_IR,                0x0C
-.set GPT_OCR1,              0x10
-.set GPT_CR_VALUE,          0x00000041
-.set TIME_SZ,               107
-
-@ Código GPT
 SET_GPT:
     @Send data do GPT hardware
     ldr	r1, =GPT_BASE
@@ -86,14 +105,6 @@ SET_GPT:
     ldr r0, =1
     str r0, [r1, #GPT_IR]
 
-
-@ TZIC Constants
-.set TZIC_BASE,             0x0FFFC000
-.set TZIC_INTCTRL,          0x0
-.set TZIC_INTSEC1,          0x84
-.set TZIC_ENSET1,           0x104
-.set TZIC_PRIOMASK,         0xC
-.set TZIC_PRIORITY9,        0x424
 
 @ Código TZIC
 SET_TZIC:
@@ -131,18 +142,19 @@ SET_TZIC:
 
 
 
-@ GPIO Definition
-.set GPIO_BASE,             0x53F84000
-.set GPIO_DR,               0x00
-.set GPIO_GDIR,             0x04
-.set GPIO_PSR,              0x08
-
 @ Faz a definição de entrada e saida do GPIO_GDIR
 SET_GPIO:
-    @ escreve o binario no registrador do GPIO para definir o que e entrada e saida
+
+    @ Escreve o binario no registrador do GPIO para definir entrada e saida
     ldr r0, =GPIO_BASE
     ldr r1, =0b11111111111111000000000000111110
     str r1, [r0, #GPIO_GDIR]
+
+    @ Muda para o modo usuário
+    msr CPSR_c, #0x10
+    @ Pula para o text do usuário
+    mov pc, #USER_TEXT
+
 
 
 @ Implementação o IRQ_HANDLER (Gerenciador de interrupções de hardware)
@@ -164,11 +176,6 @@ IRQ_HANDLER:
     @Pronto :)
 
     @ Percorre o vetor de alarmes
-    @ DO IT
-    @ 1o - Percorre o vetor de tempos, comparando se ja passou o tempo indicado para chamar a função. Ja deu o tempo?
-    @   Não - Continua percorrendo o vetor
-    @   Sim - UEPA, pega e executa essa executa a função. PROBLEMA= Como executar essa função em modo usuario e depois que ela parar, voltar ao modo supervisor...?
-    @Pronto :)
     ldr r0, =ALARMS_TIMER
     ldr r1, =ALARMS_FUNCTIONS
     ldr r2, =TIME_COUNTER
@@ -185,22 +192,21 @@ IRQ_HANDLER:
         bxge r6
         add r4, r4, #0x01
         b loop
-
-
     end_alarms:
 
     ldmfd sp!, {r4-r11, lr}
 
-    @ Subtract lr of 4
+    @ Volta para o modo de processador anterior
     sub lr, lr, #4
     movs pc, lr
+
 
 
 SVC_HANDLER:
     stmfd sp!, {lr}
 
     @ Muda o modo de operação para supervisor
-    @msr CPSR_c, #0xD3
+    @ msr CPSR_c, #0xD3
 
     cmp r7, #16
     bleq SYS_READ_SONAR
@@ -234,7 +240,6 @@ SVC_HANDLER:
 @ retorna -1 se o valor do sonar estiver incorreto
 .align 4
 SYS_READ_SONAR:
-
     stmfd sp!, {r4-r11, lr}
 
     @ Carrega a base do GPIO
@@ -500,7 +505,6 @@ SYS_SET_ALARM:
     @ Insere no vetor de função
     ldr r2, =ALARMS_FUNCTIONS
     ldr r0, [r2, r3]
-
 
 
 
