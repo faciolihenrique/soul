@@ -153,7 +153,8 @@ SET_GPIO:
     @ Muda para o modo usuário
     msr CPSR_c, #0x10
     @ Pula para o text do usuário
-    mov pc, #USER_TEXT
+    ldr r1, =USER_TEXT
+    mov pc, r1
 
 
 
