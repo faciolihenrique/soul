@@ -264,7 +264,7 @@ SYS_SET_ALARM:
     ldr r2, =TIME_COUNTER
     ldr r2, [r2]
     cmp r1, r2
-    ldrle r0, =#-2
+    ldrle r0, =-2
     ble END
 
     @ Lê o número de alarmes já criados para saber em que posição colocar o próximo
@@ -280,7 +280,7 @@ SYS_SET_ALARM:
 
     @ Como existem lugares a serem alocados no vetor, ele procura esse lugar no vetor do tempo (A primeira posição que possuir -1)
     ldr r2, =ALARMS_TIMER
-    ldr r3, =#0x0
+    ldr r3, =0x0
     search_loop:
         ldr r4, [r2, r3]
         cmp r4, #-1

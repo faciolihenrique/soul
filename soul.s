@@ -197,8 +197,8 @@ IRQ_HANDLER:
     ldr r1, =ALARMS_FUNCTIONS
     ldr r2, =TIME_COUNTER
     ldr r2, [r2]
-    ldr r3, =#0x0
-    ldr r4, =#0x0
+    ldr r3, =0x0
+    ldr r4, =0x0
 
     loop:
         cmp r4, #MAX_ALARMS
