@@ -5,8 +5,6 @@ int main(){
     int j = 0;
     set_motors_speed(20,20);
     
-    set_motors_speed(0,20);
-
     while(1 == 1){
         j++;
         read_sonar(3,&i);

@@ -3,7 +3,7 @@
 .set MAX_CALLBACKS,         0x08
 .set PSR_READ_SONARS,       0b11111111111111110000000000111111
 .set DR_MOTORS,             0b11111101111110000000000000000000
-.set PSR_FLAG,              0b00000000000000000000000000000001
+.set PSR_FLAG,              0b11111111111111100000000000111111
 
 @ GPT Constants
 .set GPT_BASE,              0x53FA0000
@@ -260,6 +260,7 @@ SVC_HANDLER:
 @  -r0 : id do sonar (numero de 0 até 16)
 @ retorna o valor medido pelo sonars
 @ retorna -1 se o valor do sonar estiver incorreto
+
 .align 4
 SYS_READ_SONAR:
     stmfd sp!, {r4-r11, lr}
@@ -287,39 +288,39 @@ SYS_READ_SONAR:
     str r2, [r5, #GPIO_DR]
 
     @ Delay de 15ms ((107Khz * 1 ms)/3)
-    @ ldr r0, #535
-    @ delay_15
-    @   sub r0, r0, #1
-    @   cmp r0, #0
-    @   bgt delay_15
+    ldr r0, =535
+    delay_15:
+        sub r0, r0, #1
+        cmp r0, #0
+        bgt delay_15
 
-    ldr r1, =TIME_COUNTER
-    ldr r0, [r1]
-    add r0, #15
-    delay_1:
-        ldr r4, [r1]
-        cmp r0, r4
-        bge delay_1
+    @ldr r1, =TIME_COUNTER
+    @ldr r0, [r1]
+    @add r0, #15
+    @delay_1:
+    @    ldr r4, [r1]
+    @    cmp r0, r4
+    @    bge delay_1
 
     @ Faz um OR com r2 e 2 para setar o trigger = 1
     orr r2, r2, #0x02
     str r2, [r5, #GPIO_DR]
 
     @ Delay de 5ms
-    ldr r1, =TIME_COUNTER
-    ldr r0, [r1]
-    add r0, #5
-    delay_2:
-        ldr r4, [r1]
-        cmp r0, r4
-        bge delay_2
+    @ldr r1, =TIME_COUNTER
+    @ldr r0, [r1]
+    @add r0, #5
+    @delay_2:
+    @    ldr r4, [r1]
+    @    cmp r0, r4
+    @    bge delay_2
 
-    @ Delay de 15ms ((107Khz * 1 ms)/3)
-    @ldr r0, #535
-    @delay_5
-    @  sub r0, r0, #1
-    @  cmp r0, #0
-    @  bgt delay_15
+    @ Delay de 5ms * ((107Khz * 1 ms)/3)
+    ldr r0, =179
+    delay_5:
+        sub r0, r0, #1
+        cmp r0, #0
+        bgt delay_5
 
     @ Desativa o trigger após os 15ms
     bic r2, r2, #0x02
@@ -327,18 +328,26 @@ SYS_READ_SONAR:
 
     @Loop para verifica a cada 10ms se o flag foi modificada
     read_sonar_loop:
+        @ Delay de 10ms ((107Khz * 1 ms)/3)
+        ldr r0,=357
+        delay_10:
+            sub r0, r0, #1
+            cmp r0, #0
+            bgt delay_10 
+        
         @ Delay de 10ms
-        ldr r1, =TIME_COUNTER
-        ldr r0, [r1]
-        add r0, #10
-        delay_3:
-            ldr r4, [r1]
-            cmp r0, r4
-            bge delay_3
+        @ldr r1, =TIME_COUNTER
+        @ldr r0, [r1]
+        @add r0, #10
+        @delay_3:
+        @    ldr r4, [r1]
+        @    cmp r0, r4
+        @    bge delay_3
+        
         @ Faz um check da flag (que esta em psr)
         @ Verifica se o valor do flag está 1
         ldr r1, [r5, #GPIO_PSR]
-        bic r2, r1, #PSR_FLAG
+        bic r2, r1,#0x01 
         cmp r2, #0x01
         bne read_sonar_loop
 
