@@ -24,7 +24,7 @@
 .set TZIC_PRIORITY9,        0x424
 
 @ CPSR
-.set USER_MODE,             0x11
+.set USER_MODE,             0x10
 .set SUPERVISRO_MODE,       0x13
 
 
@@ -96,7 +96,7 @@ RESET_HANDLER:
 
     msr CPSR_c, #0x13
     ldr sp, =SUPERVISOR_STACK
-    msr CPSR_c, #0x11
+    msr CPSR_c, #0x10
     ldr sp, =USER_STACK
     msr CPSR_c, #0x12
     ldr sp, =IRQ_STACK
@@ -172,7 +172,7 @@ SET_GPIO:
     str r1, [r0, #GPIO_GDIR]
 
     @ Muda para o modo usuário
-    msr CPSR_c, #0x11
+    msr CPSR_c, #0x10
     @ Pula para o text do usuário
     ldr r1, =USER_TEXT
     mov pc, r1
@@ -228,7 +228,7 @@ SVC_HANDLER:
     stmfd sp!, {lr}
 
     @ Muda o modo de operação para supervisor
-    @msr CPSR_c, #0xD3
+    msr CPSR_c, #0x13
 
     cmp r7, #16
     bleq SYS_READ_SONAR
