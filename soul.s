@@ -44,38 +44,6 @@ ALARMS_FUNCTIONS: .fill 4*MAX_ALARMS
 @ Vetor de interrupcoes
 .org 0x100
 
-.text
-SVC_HANDLER:
-    stmfd sp!, {lr}
-
-    @ Muda o modo de operação para supervisor
-    @msr CPSR_c, #0xD3
-
-    cmp r7, #16
-    bleq SYS_READ_SONAR
-
-    cmp r7, #17
-    bleq SYS_REG_PROX_CALLBACK
-
-    cmp r7, #18
-    bleq SYS_SET_MOTOR_SPEED
-
-    cmp r7, #19
-    bleq SYS_SET_MOTORS_SPEED
-
-    cmp r7, #20
-    bleq SYS_GET_TIME
-
-    cmp r7, #21
-    bleq SYS_SET_TIME
-
-    cmp r7, #22
-    bleq SYS_SET_ALARM
-
-    ldmfd sp!, {lr}
-    movs pc, lr
-
-
 RESET_HANDLER:
     @ Zera o contador
     ldr r2, =TIME_COUNTER
@@ -228,6 +196,35 @@ IRQ_HANDLER:
     movs pc, lr
 
 
+SVC_HANDLER:
+    stmfd sp!, {lr}
+
+    @ Muda o modo de operação para supervisor
+    @msr CPSR_c, #0xD3
+
+    cmp r7, #16
+    bleq SYS_READ_SONAR
+
+    cmp r7, #17
+    bleq SYS_REG_PROX_CALLBACK
+
+    cmp r7, #18
+    bleq SYS_SET_MOTOR_SPEED
+
+    cmp r7, #19
+    bleq SYS_SET_MOTORS_SPEED
+
+    cmp r7, #20
+    bleq SYS_GET_TIME
+
+    cmp r7, #21
+    bleq SYS_SET_TIME
+
+    cmp r7, #22
+    bleq SYS_SET_ALARM
+
+    ldmfd sp!, {lr}
+    movs pc, lr
 
 
 @ SYS_READ_SONAR
