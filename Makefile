@@ -1,16 +1,47 @@
-all: disk
+# ----------------------------------------
+# Disciplina: MC404 - 1o semestre de 2015
+# Professor: Edson Borin
+#
+# Descrição: Makefile para o segundo trabalho 
+# ----------------------------------------
 
-soul.o:
-	arm-eabi-as -g soul.s -o soul.o
+# ----------------------------------
+# SOUL object files -- Add your SOUL object files here 
+SOUL_OBJS=soul.o 
 
-soul: soul.o
-	 arm-eabi-ld soul.o -o soul -g --section-start=.iv=0x778005e0 -Ttext=0x77800700 -Tdata=0x77801800 -e 0x778005e0
+# ----------------------------------
+# Compiling/Assembling/Linking Tools and flags
+AS=arm-eabi-as
+AS_FLAGS=-g
 
-disk: soul 
-	mksd.sh --so soul --user bico
+CC=arm-eabi-gcc
+CC_FLAGS=-g
+
+LD=arm-eabi-ld
+LD_FLAGS=-g
+
+# ----------------------------------
+# Default rule
+all: disk.img
+
+# ----------------------------------
+# Generic Rules
+%.o: %.s
+	$(AS) $(AS_FLAGS) $< -o $@
+
+%.o: %.c
+	$(CC) $(CC_FLAGS) -c $< -o $@
+
+# ----------------------------------
+# Specific Rules
+SOUL.x: $(SOUL_OBJS)
+	$(LD) $^ -o $@ $(LD_FLAGS) --section-start=.iv=0x778005e0 -Ttext=0x77800700 -Tdata=0x77801800 -e 0x778005e0
+
+LOCO.x: loco.o bico.o
+	$(LD) $^ -o $@ $(LD_FLAGS) -Ttext=0x77802000
+
+disk.img: SOUL.x LOCO.x
+	mksd.sh --so SOUL.x --user LOCO.x
 
 clean:
-	rm soul.o disk.img soul
-
-run:
-	player -g /home/specg12-1/mc404/simulador/simulador_player/worlds_mc404/simple.cfg 
+	rm -f SOUL.x LOCO.x disk.img *.o

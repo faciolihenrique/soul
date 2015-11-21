@@ -2,7 +2,7 @@
 .set MAX_ALARMS,            0x08
 .set MAX_CALLBACKS,         0x08
 .set PSR_READ_SONARS,       0b11111111111111110000000000111111
-.set DR_MOTORS,             0b00000000000000000001111110111111
+.set DR_MOTORS,             0b11111101111110000000000000000000
 .set PSR_FLAG,              0b00000000000000000000000000000001
 
 @ GPT Constants
@@ -23,11 +23,19 @@
 .set TZIC_PRIOMASK,         0xC
 .set TZIC_PRIORITY9,        0x424
 
+@ CPSR
+.set USER_MODE,             0x11
+.set SUPERVISRO_MODE,       0x13
+
+
 @ GPIO Definition
 .set GPIO_BASE,             0x53F84000
 .set GPIO_DR,               0x00
 .set GPIO_GDIR,             0x04
 .set GPIO_PSR,              0x08
+
+@ Stacks
+.set STACK_SIZE,            0x600
 
 @ USER
 .set USER_TEXT,             0x77802000
@@ -70,6 +78,12 @@ ALARMS_TIMER: .fill 4*MAX_ALARMS, 0
 ALARMS_FUNCTIONS: .fill 4*MAX_ALARMS
 
 
+@ Inicializa os stack-pointers
+USER_STACK: .fill STACK_SIZE
+SUPERVISOR_STACK: .fill STACK_SIZE
+IRQ_STACK: .fill STACK_SIZE
+FIQ_STACK: .fill STACK_SIZE
+
 .text
 @ Vetor de interrupcoes
 .org 0x100
@@ -77,8 +91,15 @@ ALARMS_FUNCTIONS: .fill 4*MAX_ALARMS
 RESET_HANDLER:
     @ Zera o contador
     ldr r2, =TIME_COUNTER
-    mov r0,#0
+    mov r0,#01
     str r0,[r2]
+
+    msr CPSR_c, #0x13
+    ldr sp, =SUPERVISOR_STACK
+    msr CPSR_c, #0x11
+    ldr sp, =USER_STACK
+    msr CPSR_c, #0x12
+    ldr sp, =IRQ_STACK
 
     @Set interrupt table base address on coprocessor 15.
     ldr r0, =interrupt_vector
@@ -151,7 +172,7 @@ SET_GPIO:
     str r1, [r0, #GPIO_GDIR]
 
     @ Muda para o modo usuário
-    msr CPSR_c, #0x10
+    msr CPSR_c, #0x11
     @ Pula para o text do usuário
     ldr r1, =USER_TEXT
     mov pc, r1
@@ -207,7 +228,7 @@ SVC_HANDLER:
     stmfd sp!, {lr}
 
     @ Muda o modo de operação para supervisor
-    @ msr CPSR_c, #0xD3
+    @msr CPSR_c, #0xD3
 
     cmp r7, #16
     bleq SYS_READ_SONAR
@@ -293,6 +314,13 @@ SYS_READ_SONAR:
         cmp r0, r4
         bge delay_2
 
+    @ Delay de 15ms ((107Khz * 1 ms)/3)
+    @ldr r0, #535
+    @delay_5
+    @  sub r0, r0, #1
+    @  cmp r0, #0
+    @  bgt delay_15
+
     @ Desativa o trigger após os 15ms
     bic r2, r2, #0x02
     str r2, [r5, #GPIO_DR]
@@ -377,6 +405,7 @@ SYS_REG_PROX_CALLBACK:
 
 .align 4
 SYS_SET_MOTOR_SPEED:
+    
     stmfd sp!, {r4-r11, lr}
 
     @ Verifica se os parametros passados sao validos
@@ -431,10 +460,12 @@ SYS_SET_MOTORS_SPEED:
 
     @coloca o valor de r2 na posicao de memoria correspondente do motor r0
     mov r3, #0
+    
     @desloca o valor 26 bits, para cair na faixa do motor 0, com 0 no valorde write (talvez bit de write)
-    add r3, r3, r1,lsl #26
+    orr r3, r3, r1, lsl #26
+    
     @soma o valor de r1, que ja vai ficar no local correto
-    add r3, r3, r2,lsl #19
+    orr r3, r3, r0, lsl #19
 
     @passa endereco armazenar nos dados
     ldr r5, =GPIO_BASE
