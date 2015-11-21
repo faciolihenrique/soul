@@ -20,11 +20,19 @@ interrupt_vector:
 @ Periféricos com clock de 107KHz
 TIME_COUNTER: .word 0x0
 
-@ SVC
+@ SVC Constants
+.set MAX_ALARMS,            0x08
+.set MAX_CALLBACKS,         0x08
+.set PSR_READ_SONARS,       0b11111111111111110000000000111111
+.set DR_MOTORS,             0b00000000000000000001111110111111
+.set PSR_FLAG,              0b00000000000000000000000000000001
+
+@ SVC variables
 N_CALLBACKS: .word 0x0
 SHIFT_CALLBACKS: .word 0x0
 
 @criei esses vetores para guardar os valores das callbacks. ponteiros,limiares e identificadores
+
 CALLBACK_ID_VECTOR: .fill 4*MAX_CALLBACKS
 CALLBACK_DIST_VECTOR: .fill 4*MAX_CALLBACKS
 CALLBACK_POITERS_VECTOR: .fill 4*MAX_CALLBACKS
@@ -41,7 +49,7 @@ SVC_HANDLER:
     stmfd sp!, {lr}
 
     @ Muda o modo de operação para supervisor
-    msr CPSR_c, #0xD3
+    @msr CPSR_c, #0xD3
 
     cmp r7, #16
     bleq SYS_READ_SONAR
@@ -220,14 +228,7 @@ IRQ_HANDLER:
     movs pc, lr
 
 
-@ SVC Constants
-.set MAX_ALARMS,            0x08
-.set MAX_CALLBACKS,         0x08
-.set PSR_READ_SONARS,       0b11111111111111110000000000111111
-.set DR_MOTORS,             0b00000000000000000001111110111111
-.set PSR_FLAG,              0b00000000000000000000000000000001
 
-.text
 
 @ SYS_READ_SONAR
 @ Syscall que lê o valor de um sonar
@@ -472,7 +473,7 @@ SYS_SET_ALARM:
     ldr r2, =TIME_COUNTER
     ldr r2, [r2]
     cmp r1, r2
-    ldrle r0, =#-2
+    ldrle r0, =-2
     ble SVC_END
 
     @ Lê o número de alarmes já criados para saber em que posição colocar opróximo
@@ -488,7 +489,7 @@ SYS_SET_ALARM:
 
     @ Como existem lugares a serem alocados no vetor, ele procura esse lugarno vetor do tempo (A primeira posição que possuir -1)
     ldr r2, =ALARMS_TIMER
-    ldr r3, =#0x0
+    ldr r3, =0x0
     search_loop:
         ldr r4, [r2, r3]
         cmp r4, #-1
