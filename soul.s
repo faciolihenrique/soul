@@ -188,14 +188,54 @@ IRQ_HANDLER:
     ldr r0, [r2]                    @load in r0 the value of r2 adress
     add r0, r0, #0x1                @increment in 1 TIME_COUNTER
     str r0, [r2]                    @store it in the r2 adress
+    
+    @ percore o vetor de callbacks, ou seja, as ids, os limiares e os ponteiros de funcao de retorno
+    ldr r1, =CALLBACK_ID_VECTOR
+    ldr r2, =CALLBACK_DIST_VECTOR
+    ldr r3, =CALLBACK_POINTERS_VECTOR
+    ldr r4, =0x4
 
-    @ Percorre o vetor de callbacks
-    @ JUST DO IT!
-    @ 1o - Percorre o vetor dos sonares a serem chamados, invocando a syscall read_sonar
-    @ 2o - Analisa o valor retornado pela syscall. Deu certo?
-    @   Não - Continua percorrendo o vetor
-    @   Sim - UEPA, pega e executa essa executa a função. PROBLEMA= Como executar essa função em modo usuario e depois que ela parar, voltar ao modo supervisor...?
-    @Pronto :)
+    @registrador para comparar com o numero de callbacks pedidas pelo usuario
+    ldr r8, =0x1
+    ldr r9, =N_CALLBACKS
+    ldr r9, [r9]
+
+    @ carrega os valores do vetor nos registradores, para realizar as operacoes
+    @ em r5 o id do sonar, em r6 o limiar e em r3 o ponteiro da funcao
+    loop_callbacks:
+        mov r5, [r1]
+        mov r6, [r2]
+
+        @chama a sycall para obter o valor da distancia
+        mov r0, r5
+        mov r7, #16
+        svc 0x0
+        
+        @compara o retorno da funcao com o limiar e move o ponteiro pra pc condicionalmente
+        cmp r0, r6
+        movlt pc, r3
+        
+        @ soma o valor de r4 com a posicao atual dos vetores para continuar percorrendo-os
+        add r1, r1, r4
+        add r2, r2, r4
+        add r3, r3, r4
+
+        @soma 4 no valor de r4, para continuar a percorrer os vetores
+        add r4, r4, #4
+
+        @soma 1 ao registrador que esta sendo usado para comparar o numero de callbacks, para nao acessar memoria nao alocada
+        add r8, r8, #1
+
+        @compara com o numero de callbacks registradas ate o momento
+        cmp r8, r9
+        bgt SVC_END
+
+        @caso os vetores ainda estejam em uma posicao valida de memoria, continua o loop
+        cmp r4, #30
+        blt loop_callbacks
+
+        @caso nenhuma das condicoes anteriores seja bem sucedida, vai para o final
+        b SVC_END 
 
     @ Percorre o vetor de alarmes
     ldr r0, =ALARMS_TIMER
