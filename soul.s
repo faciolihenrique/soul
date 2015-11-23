@@ -14,6 +14,8 @@
 .set GPT_IR,                0x0C
 .set GPT_OCR1,              0x10
 .set GPT_CR_VALUE,          0x00000041
+
+@ Periféricos com clock de 107KHz
 .set TIME_SZ,               107
 
 @ TZIC Constants
@@ -64,7 +66,7 @@ interrupt_vector:
 
 
 .data
-@ Periféricos com clock de 107KHz
+@ Variavel para armazenar o tempo de sistema
 TIME_COUNTER: .word 0x0
 
 @ SVC variables
@@ -123,7 +125,7 @@ SET_GPT:
     ldr r0, =0
     str r0, [r1, #GPT_PR]
 
-    @ Gera interrupções a cada 2*10^5 ciclos
+    @ Gera interrupções
     ldr r0, =TIME_SZ
     str r0, [r1, #GPT_OCR1]
 
@@ -193,12 +195,13 @@ IRQ_HANDLER:
     ldr r0, =1
     str r0, [r1, #GPT_SR]
 
-    @ Increment the counter
+    @ Tempo de Sistema
     ldr r2, =TIME_COUNTER           @Load the TIME_COUNTER adress on r2
     ldr r0, [r2]                    @load in r0 the value of r2 adress
     add r0, r0, #0x1                @increment in 1 TIME_COUNTER
     str r0, [r2]                    @store it in the r2 adress
 
+    @ Callbacks
     @ percore o vetor de callbacks, ou seja, as ids, os limiares e os ponteiros de funcao de retorno
     ldr r1, =CALLBACK_ID_VECTOR
     ldr r2, =CALLBACK_DIST_VECTOR
@@ -247,7 +250,8 @@ IRQ_HANDLER:
         @caso nenhuma das condicoes anteriores seja bem sucedida, vai para o final
         b SVC_END
 
-    @ Percorre o vetor de alarmes
+
+    @ Alarmes
     ldr r0, =ALARMS_TIMER
     ldr r1, =ALARMS_FUNCTIONS
     ldr r2, =TIME_COUNTER
