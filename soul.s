@@ -3,7 +3,8 @@
 .set MAX_CALLBACKS,         0x08
 .set PSR_READ_SONARS,       0b11111111111111110000000000111111
 .set DR_MOTORS,             0b11111101111110000000000000000000
-.set PSR_FLAG,              0b11111111111111100000000000111111
+.set PSR_FLAG,              0b11111111111111111111111111111110
+.set PSR_READ_SONAR,        0b11111111111111100000000000111111
 
 @ GPT Constants
 .set GPT_BASE,              0x53FA0000
@@ -25,7 +26,10 @@
 
 @ CPSR
 .set USER_MODE,             0x10
+.set FIQ_MODE,              0x11
+.set IRQ_MODE,              0x12
 .set SUPERVISRO_MODE,       0x13
+
 
 
 @ GPIO Definition
@@ -94,12 +98,13 @@ RESET_HANDLER:
     mov r0,#01
     str r0,[r2]
 
-    msr CPSR_c, #0x13
-    ldr sp, =SUPERVISOR_STACK
-    msr CPSR_c, #0x10
+    @ Iniciliza a pilha de cada um dos modos
+    msr CPSR_c, #USER_MODE
     ldr sp, =USER_STACK
-    msr CPSR_c, #0x12
+    msr CPSR_c, #IRQ_MODE
     ldr sp, =IRQ_STACK
+    msr CPSR_c, #SUPERVISRO_MODE
+    ldr sp, =SUPERVISOR_STACK
 
     @Set interrupt table base address on coprocessor 15.
     ldr r0, =interrupt_vector
@@ -122,7 +127,7 @@ SET_GPT:
     ldr r0, =TIME_SZ
     str r0, [r1, #GPT_OCR1]
 
-    @Enabling Output Compare Channel 1 interrupt
+    @ Ativa as interrupções no channel 1
     ldr r0, =1
     str r0, [r1, #GPT_IR]
 
@@ -172,7 +177,7 @@ SET_GPIO:
     str r1, [r0, #GPIO_GDIR]
 
     @ Muda para o modo usuário
-    msr CPSR_c, #0x10
+    msr CPSR_c, #USER_MODE
     @ Pula para o text do usuário
     ldr r1, =USER_TEXT
     mov pc, r1
@@ -183,12 +188,17 @@ SET_GPIO:
 IRQ_HANDLER:
     stmfd sp!, {r4-r11, lr}
 
+    @ Define o GPT_SR para avisar sobre a interrupção
+    ldr	r1, =GPT_BASE
+    ldr r0, =1
+    str r0, [r1, #GPT_SR]
+
     @ Increment the counter
     ldr r2, =TIME_COUNTER           @Load the TIME_COUNTER adress on r2
     ldr r0, [r2]                    @load in r0 the value of r2 adress
     add r0, r0, #0x1                @increment in 1 TIME_COUNTER
     str r0, [r2]                    @store it in the r2 adress
-    
+
     @ percore o vetor de callbacks, ou seja, as ids, os limiares e os ponteiros de funcao de retorno
     ldr r1, =CALLBACK_ID_VECTOR
     ldr r2, =CALLBACK_DIST_VECTOR
@@ -210,11 +220,11 @@ IRQ_HANDLER:
         mov r0, r5
         mov r7, #16
         svc 0x0
-        
+
         @compara o retorno da funcao com o limiar e move o ponteiro pra pc condicionalmente
         cmp r0, r6
         movlt pc, r3
-        
+
         @ soma o valor de r4 com a posicao atual dos vetores para continuar percorrendo-os
         add r1, r1, r4
         add r2, r2, r4
@@ -235,7 +245,7 @@ IRQ_HANDLER:
         blt loop_callbacks
 
         @caso nenhuma das condicoes anteriores seja bem sucedida, vai para o final
-        b SVC_END 
+        b SVC_END
 
     @ Percorre o vetor de alarmes
     ldr r0, =ALARMS_TIMER
@@ -267,7 +277,7 @@ IRQ_HANDLER:
 SVC_HANDLER:
     stmfd sp!, {lr}
 
-    @ Muda o modo de operação para supervisor
+    @ Muda o modo de operação para supervisor com interrupções
     msr CPSR_c, #0x13
 
     cmp r7, #16
@@ -334,26 +344,18 @@ SYS_READ_SONAR:
         cmp r0, #0
         bgt delay_15
 
-    @ldr r1, =TIME_COUNTER
-    @ldr r0, [r1]
-    @add r0, #15
-    @delay_1:
-    @    ldr r4, [r1]
-    @    cmp r0, r4
-    @    bge delay_1
+@ Antigo delay, tentando usar o GPT
+@ldr r1, =TIME_COUNTER
+@ldr r0, [r1]
+@add r0, #15
+@delay_1:
+@    ldr r4, [r1]
+@    cmp r0, r4
+@    bge delay_1
 
     @ Faz um OR com r2 e 2 para setar o trigger = 1
     orr r2, r2, #0x02
     str r2, [r5, #GPIO_DR]
-
-    @ Delay de 5ms
-    @ldr r1, =TIME_COUNTER
-    @ldr r0, [r1]
-    @add r0, #5
-    @delay_2:
-    @    ldr r4, [r1]
-    @    cmp r0, r4
-    @    bge delay_2
 
     @ Delay de 5ms * ((107Khz * 1 ms)/3)
     ldr r0, =179
@@ -373,26 +375,18 @@ SYS_READ_SONAR:
         delay_10:
             sub r0, r0, #1
             cmp r0, #0
-            bgt delay_10 
-        
-        @ Delay de 10ms
-        @ldr r1, =TIME_COUNTER
-        @ldr r0, [r1]
-        @add r0, #10
-        @delay_3:
-        @    ldr r4, [r1]
-        @    cmp r0, r4
-        @    bge delay_3
-        
+            bgt delay_10
+
         @ Faz um check da flag (que esta em psr)
         @ Verifica se o valor do flag está 1
         ldr r1, [r5, #GPIO_PSR]
-        bic r2, r1,#0x01 
+        ldr r2, =PSR_FLAG
+        bic r2, r1, r2
         cmp r2, #0x01
         bne read_sonar_loop
 
     @ Pega os valores da leitura do sonar
-    ldr r6, =PSR_FLAG
+    ldr r6, =PSR_READ_SONAR
     bic r0, r1, r6
     mov r0, r0, lsr #6
 
@@ -454,7 +448,7 @@ SYS_REG_PROX_CALLBACK:
 
 .align 4
 SYS_SET_MOTOR_SPEED:
-    
+
     stmfd sp!, {r4-r11, lr}
 
     @ Verifica se os parametros passados sao validos
@@ -509,10 +503,10 @@ SYS_SET_MOTORS_SPEED:
 
     @coloca o valor de r2 na posicao de memoria correspondente do motor r0
     mov r3, #0
-    
+
     @desloca o valor 26 bits, para cair na faixa do motor 0, com 0 no valorde write (talvez bit de write)
     orr r3, r3, r1, lsl #26
-    
+
     @soma o valor de r1, que ja vai ficar no local correto
     orr r3, r3, r0, lsl #19
 
@@ -586,8 +580,6 @@ SYS_SET_ALARM:
     @ Insere no vetor de função
     ldr r2, =ALARMS_FUNCTIONS
     ldr r0, [r2, r3]
-
-
 
 SVC_END:
     ldmfd sp!, {r4-r11, lr}
