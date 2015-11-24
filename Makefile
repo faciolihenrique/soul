@@ -45,3 +45,15 @@ disk.img: SOUL.x LOCO.x
 
 clean:
 	rm -f SOUL.x LOCO.x disk.img *.o
+
+ambiente:
+	 source /home/specg12-1/mc404/simulador/set_path_player.sh 
+
+player:
+	 player /home/specg12-1/mc404/simulador/simulador_player/worlds_mc404/simple.cfg
+
+sim_debug:
+	 armsim_player --rom=/home/specg12-1/mc404/simulador/simulador_player/bin/dumboot.bin --sd=disk.img -g
+
+sim:
+	 armsim_player --rom=/home/specg12-1/mc404/simulador/simulador_player/bin/dumboot.bin --sd=disk.img 

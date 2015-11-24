@@ -76,7 +76,7 @@ SHIFT_CALLBACKS: .word 0x0
 @ Vetores para guardar os valores das callbacks. ponteiros,limiares e identificadores
 CALLBACK_ID_VECTOR: .fill 4*MAX_CALLBACKS
 CALLBACK_DIST_VECTOR: .fill 4*MAX_CALLBACKS
-CALLBACK_POITERS_VECTOR: .fill 4*MAX_CALLBACKS
+CALLBACK_POINTERS_VECTOR: .fill 4*MAX_CALLBACKS
 
 @ Vetores que armazenas um ponteriro para uma função e o tempo que deve serexecutado
 N_ALARMS: .word 0x0
@@ -201,6 +201,35 @@ IRQ_HANDLER:
     add r0, r0, #0x1                @increment in 1 TIME_COUNTER
     str r0, [r2]                    @store it in the r2 adress
 
+
+    
+    @ Alarmes
+    ldr r0, =ALARMS_TIMER
+    ldr r1, =ALARMS_FUNCTIONS
+    ldr r2, =TIME_COUNTER
+    ldr r2, [r2]
+    ldr r3, =0x0
+    ldr r4, =0x0
+
+    loop:
+        cmp r4, #MAX_ALARMS
+        bge end_alarms
+        ldr r5, [r0, r3]
+        cmp r6, r2
+        ldrge r6, [r1, r3]
+        bxge r6
+        add r4, r4, #0x01
+        b loop
+    end_alarms:
+
+    ldmfd sp!, {r4-r11, lr}
+
+    @ Volta para o modo de processador anterior
+    sub lr, lr, #4
+    movs pc, lr
+
+
+    
     @ Callbacks
     @ percore o vetor de callbacks, ou seja, as ids, os limiares e os ponteiros de funcao de retorno
     ldr r1, =CALLBACK_ID_VECTOR
@@ -216,8 +245,8 @@ IRQ_HANDLER:
     @ carrega os valores do vetor nos registradores, para realizar as operacoes
     @ em r5 o id do sonar, em r6 o limiar e em r3 o ponteiro da funcao
     loop_callbacks:
-        mov r5, [r1]
-        mov r6, [r2]
+        ldr r5, [r1]
+        ldr r6, [r2]
 
         @chama a sycall para obter o valor da distancia
         mov r0, r5
@@ -251,38 +280,13 @@ IRQ_HANDLER:
         b SVC_END
 
 
-    @ Alarmes
-    ldr r0, =ALARMS_TIMER
-    ldr r1, =ALARMS_FUNCTIONS
-    ldr r2, =TIME_COUNTER
-    ldr r2, [r2]
-    ldr r3, =0x0
-    ldr r4, =0x0
-
-    loop:
-        cmp r4, #MAX_ALARMS
-        bge end_alarms
-        ldr r5, [r0, r3]
-        cmp r6, r2
-        ldrge r6, [r1, r3]
-        bxge r6
-        add r4, r4, #0x01
-        b loop
-    end_alarms:
-
-    ldmfd sp!, {r4-r11, lr}
-
-    @ Volta para o modo de processador anterior
-    sub lr, lr, #4
-    movs pc, lr
-
-
+   
 
 SVC_HANDLER:
     stmfd sp!, {lr}
 
     @ Muda o modo de operação para supervisor com interrupções
-    msr CPSR_c, #0x13
+    @msr CPSR_c, #0x13
 
     cmp r7, #16
     bleq SYS_READ_SONAR
@@ -383,7 +387,7 @@ SYS_READ_SONAR:
 
         @ Faz um check da flag (que esta em psr)
         @ Verifica se o valor do flag está 1
-        ldr r1, [r5, #GPIO_PSR]
+        ldr r1, [r5, #GPIO_DR]
         ldr r2, =PSR_FLAG
         bic r2, r1, r2
         cmp r2, #0x01
@@ -423,7 +427,7 @@ SYS_REG_PROX_CALLBACK:
     @carrega as posicoes que o comeco dos vetores estao na memoria
     ldr r3, =CALLBACK_ID_VECTOR
     ldr r4, =CALLBACK_DIST_VECTOR
-    ldr r5, =CALLBACK_POITERS_VECTOR
+    ldr r5, =CALLBACK_POINTERS_VECTOR
 
     @salva o que foi passado pelo usuario, nas posicoes correspondentes decada vetor
     ldr r6, =SHIFT_CALLBACKS
@@ -588,3 +592,4 @@ SYS_SET_ALARM:
 SVC_END:
     ldmfd sp!, {r4-r11, lr}
     mov pc, lr
+
