@@ -27,11 +27,12 @@
 .set TZIC_PRIORITY9,        0x424
 
 @ CPSR
-.set USER_MODE,             0x10
-.set FIQ_MODE,              0x11
+.set USER_MODE,		    0x10
+.set SYS_MODE,              0xDF
+.set FIQ_MODE,              0xD1
 .set IRQ_MODE,              0x12
-.set SUPERVISRO_MODE,       0x13
-
+.set IRQ_NO_INTERRUPT,	    0xD2
+.set SUPERVISOR_MODE,       0x13
 
 
 @ GPIO Definition
@@ -41,10 +42,10 @@
 .set GPIO_PSR,              0x08
 
 @ Stacks
-.set STACK_SIZE,            0x600
+.set STACK_SIZE,            1024
 
 @ USER
-.set USER_TEXT,             0x77802000
+.set USER_TEXT,             0x77803000
 
 
 @@@ Start @@@
@@ -85,10 +86,12 @@ ALARMS_FUNCTIONS: .fill 4*MAX_ALARMS
 
 
 @ Inicializa os stack-pointers
-USER_STACK: .fill STACK_SIZE
-SUPERVISOR_STACK: .fill STACK_SIZE
-IRQ_STACK: .fill STACK_SIZE
-FIQ_STACK: .fill STACK_SIZE
+.fill STACK_SIZE
+USER_STACK: 
+.fill STACK_SIZE 
+SUPERVISOR_STACK: 
+.fill STACK_SIZE
+IRQ_STACK:
 
 .text
 @ Vetor de interrupcoes
@@ -101,13 +104,13 @@ RESET_HANDLER:
     str r0,[r2]
 
     @ Iniciliza a pilha de cada um dos modos
-    msr CPSR_c, #USER_MODE
-    ldr sp, =USER_STACK
-    msr CPSR_c, #IRQ_MODE
-    ldr sp, =IRQ_STACK
-    msr CPSR_c, #SUPERVISRO_MODE
+    msr CPSR_c, #SUPERVISOR_MODE
     ldr sp, =SUPERVISOR_STACK
-
+    msr CPSR_c, #SYS_MODE
+    ldr sp, =USER_STACK
+    msr CPSR_c, #IRQ_NO_INTERRUPT
+    ldr sp, =IRQ_STACK
+    
     @Set interrupt table base address on coprocessor 15.
     ldr r0, =interrupt_vector
     mcr p15, 0, r0, c12, c0, 0
@@ -189,7 +192,7 @@ SET_GPIO:
 @ Implementação o IRQ_HANDLER (Gerenciador de interrupções de hardware)
 IRQ_HANDLER:
     stmfd sp!, {r4-r11, lr}
-
+   
     @ Define o GPT_SR para avisar sobre a interrupção
     ldr	r1, =GPT_BASE
     ldr r0, =1
@@ -217,9 +220,10 @@ IRQ_HANDLER:
         ldr r5, [r0, r3]
         cmp r6, r2
         ldrge r6, [r1, r3]
-        bxge r6
+        blxge r6
         add r4, r4, #0x01
         b loop
+    
     end_alarms:
 
     ldmfd sp!, {r4-r11, lr}
@@ -286,7 +290,7 @@ SVC_HANDLER:
     stmfd sp!, {lr}
 
     @ Muda o modo de operação para supervisor com interrupções
-    @msr CPSR_c, #0x13
+    msr CPSR_c, #0xD3
 
     cmp r7, #16
     bleq SYS_READ_SONAR
@@ -346,27 +350,18 @@ SYS_READ_SONAR:
     str r2, [r5, #GPIO_DR]
 
     @ Delay de 15ms ((107Khz * 1 ms)/3)
-    ldr r0, =535
+    ldr r0, =540
     delay_15:
         sub r0, r0, #1
         cmp r0, #0
         bgt delay_15
-
-@ Antigo delay, tentando usar o GPT
-@ldr r1, =TIME_COUNTER
-@ldr r0, [r1]
-@add r0, #15
-@delay_1:
-@    ldr r4, [r1]
-@    cmp r0, r4
-@    bge delay_1
 
     @ Faz um OR com r2 e 2 para setar o trigger = 1
     orr r2, r2, #0x02
     str r2, [r5, #GPIO_DR]
 
     @ Delay de 5ms * ((107Khz * 1 ms)/3)
-    ldr r0, =179
+    ldr r0, =180
     delay_5:
         sub r0, r0, #1
         cmp r0, #0
@@ -379,7 +374,7 @@ SYS_READ_SONAR:
     @Loop para verifica a cada 10ms se o flag foi modificada
     read_sonar_loop:
         @ Delay de 10ms ((107Khz * 1 ms)/3)
-        ldr r0,=357
+        ldr r0,=360
         delay_10:
             sub r0, r0, #1
             cmp r0, #0
