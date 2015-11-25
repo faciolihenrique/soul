@@ -74,7 +74,7 @@ TIME_COUNTER: .word 0x0
 N_CALLBACKS: .word 0x0
 
 @ Vetores para guardar os valores das callbacks. ponteiros,limiares e identificadores
-CALLBACK_ID_VECTOR: .fill 4*MAX_CALLBACKS
+    CALLBACK_ID_VECTOR: .fill 4*MAX_CALLBACKS, 0xA0
 CALLBACK_DIST_VECTOR: .fill 4*MAX_CALLBACKS
 CALLBACK_POINTERS_VECTOR: .fill 4*MAX_CALLBACKS
 
@@ -226,42 +226,94 @@ IRQ_HANDLER:
     ldr r9, [r8]
 
 
-    loop:
+    loop_irq_alarms:
         cmp r9, #0
         beq end_irq_alarms
 
-	ldr r5, [r0, r3]
+	    ldr r5, [r0, r3]
 
-	@ Compara com 0 para saber se há uma função ou não
-	cmp r5, #0
-	addeq r3, r3, #0x04
-	beq loop
+	    @Compara com 0 para saber se há uma função ou não
+	    cmp r5, #0
+	    addeq r3, r3, #0x04
+	    beq loop
 
-	@ Algum valor != de 0 foi emcontrada na memoria
-	sub r9, r9, #0x01
+        @ Algum valor != de 0 foi emcontrada na memoria
+        sub r9, r9, #0x01
 
-	@ Verifica se já chegou no tempo desejado
-	cmp r2, r5
-	ldrge r5, =0x0
-	strge r5, [r0, r3]
+        @ Verifica se já chegou no tempo desejado
+        cmp r2, r5
+        ldrge r5, =0x0
+        strge r5, [r0, r3]
 
-	@ Carrega em r6 o endereço de chamada
-	ldrge r6, [r1, r3]
+        @ Carrega em r6 o endereço de chamada
+        ldrge r6, [r1, r3]
 
-	@ Faz a chamada da função
-	@stmfd sp!, {r0-r11, lr}
-	blxge r6
-	@ldmfd sp!, {r0-r11, lr}
+        @ Faz a chamada da função
+        @stmfd sp!, {r0-r11, lr}
+        blxge r6
+        @ldmfd sp!, {r0-r11, lr}
 
-	@ Remove do contador de funçoes ativas
-	ldrge r10, [r8]
-	subge r10, r10, #0x01
-	strge r10, [r8]
+        @ Remove do contador de funçoes ativas
+        ldrge r10, [r8]
+        subge r10, r10, #0x01
+        strge r10, [r8]
 
-	add r3, r3, #0x04
-        b loop
+        add r3, r3, #0x04
+    b loop
 
 end_irq_alarms:
+    ldmfd sp!,{r0-r12, lr}
+
+    sub lr, lr, #4
+    movs pc, lr
+
+
+    @ Percorrer o vetor de callbacks
+    ldr r4, =CALLBACK_ID_VECTOR
+    ldr r5, =CALLBACK_DIST_VECTOR
+    ldr r6, =CALLBACK_POINTERS_VECTOR
+
+    ldr r3, =0x0
+
+    ldr r8, =N_CALLBACKS
+    ldr r8, [r8]
+
+
+    loop_irq_callbacks:
+        cmp r8, #0
+        beq end_irq_alarms
+
+        @ Carrega a posição do sonar em r0
+        ldr r0, [r4 r3]
+        @ Compara com 0x0A para saber se há uma callback nesse endereço ou não
+        cmp r0, #0xA0
+        addeq r3, r3, #0x04
+        beq loop
+
+        @ Algum valor != de 0xA0 foi encontrada na memoria
+        sub r8, r8, #0x01
+
+        @ Verifica a leitura do sonar
+        mov r7, #16
+        svc 0x0
+
+        @ Verifica se já chegou no limiar desejado desejado
+        ldr r1, [r5, r3]
+        cmp r0, r1
+
+        @ Carrega em r6 o endereço de chamada
+        ldrle r2, [r6, r3]
+
+        @ Faz a chamada da função
+        stmfd sp!, {r0-r11, lr}
+        blxge r2
+        ldmfd sp!, {r0-r11, lr}
+
+        @ Remove do contador de funçoes ativas
+        add r3, r3, #0x04
+    b loop
+
+end_irq_callbacks:
     ldmfd sp!,{r0-r12, lr}
 
     sub lr, lr, #4
@@ -426,6 +478,8 @@ erro_sonar:
 end_read_sonar:
     ldmfd sp!, {r4-r11, lr}
     movs pc, lr
+
+
 
 
 
@@ -666,12 +720,12 @@ SYS_SET_CALLBACK:
     str r3, [r4]
 
     @ Como existem lugares a serem alocados no vetor, ele procura esse lugar no vetor de limiar (A primeira posição que possuir 0)
-    ldr r3, =CALLBACK_DIST_VECTOR
+    ldr r3, =CALLBACK_ID_VECTOR
     ldr r4, =0x0
     search_callbacks_loop:
         ldr r5, [r3, r4]
-        cmp r5, #0
-	beq end_search_callbacks
+        cmp r5, #0xA0
+	    beq end_search_callbacks
         add r4, r4, #0x04
         cmp r4, #32
         blt search_callbacks_loop
@@ -682,7 +736,7 @@ SYS_SET_CALLBACK:
     str r1, [r3, r4]
 
     @ Insere no vetor de função
-    ldr r3, =CALLBACK_ID_VECTOR
+    ldr r3, =CALLBACK_DIST_VECTOR
     str r0, [r3, r4]
     ldr r3, =CALLBACK_POINTERS_VECTOR
     str r0, [r3, r4]
