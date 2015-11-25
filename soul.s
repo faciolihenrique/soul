@@ -81,8 +81,8 @@ CALLBACK_POINTERS_VECTOR: .fill 4*MAX_CALLBACKS
 
 @ Vetores que armazenas um ponteriro para uma função e o tempo que deve serexecutado
 N_ALARMS: .word 0x0
-ALARMS_TIMER: .fill 4*MAX_ALARMS, 0
-ALARMS_FUNCTIONS: .fill 4*MAX_ALARMS
+ALARMS_TIMER: .fill 32
+ALARMS_FUNCTIONS: .fill 32
 
 
 @ Inicializa os stack-pointers
@@ -92,6 +92,7 @@ USER_STACK:
 SUPERVISOR_STACK: 
 .fill STACK_SIZE
 IRQ_STACK:
+.fill STACK_SIZE
 
 .text
 @ Vetor de interrupcoes
@@ -191,8 +192,13 @@ SET_GPIO:
 
 @ Implementação o IRQ_HANDLER (Gerenciador de interrupções de hardware)
 IRQ_HANDLER:
-    stmfd sp!, {r4-r11, lr}
+    stmfd sp!, {r0-r12, lr}
+    
+    @ Salva o estado do programa
+    @mrs r0, SPSR
+    @stmfd sp!, {r0}
    
+
     @ Define o GPT_SR para avisar sobre a interrupção
     ldr	r1, =GPT_BASE
     ldr r0, =1
@@ -206,29 +212,57 @@ IRQ_HANDLER:
 
 
     
-    @ Alarmes
+    @ Percorrer o vetor de alarmes
     ldr r0, =ALARMS_TIMER
     ldr r1, =ALARMS_FUNCTIONS
     ldr r2, =TIME_COUNTER
     ldr r2, [r2]
     ldr r3, =0x0
     ldr r4, =0x0
+    ldr r7, =0x0
+    ldr r8, =N_ALARMS
+    ldr r9, [r8]
+    
 
     loop:
-        cmp r4, #MAX_ALARMS
-        bge end_alarms
-        ldr r5, [r0, r3]
-        cmp r6, r2
-        ldrge r6, [r1, r3]
-        blxge r6
-        add r4, r4, #0x01
+        cmp r9, #0
+        beq end_alarms
+        
+	ldr r5, [r0, r3]
+
+	@ Compara com 0 para saber se há uma função ou não
+	cmp r5, #0
+	addeq r3, r3, #0x04
+	beq loop
+	
+	@ Algum valor != de 0 foi emcontrada na memoria
+	sub r9, r9, #0x01
+	
+	@ Verifica se já chegou no tempo desejado
+	cmp r2, r5		   
+	ldrge r5, =0x0
+	strge r5, [r0, r3]
+
+	@ Carrega em r6 o endereço de chamada
+	ldrge r6, [r1, r3]	    	
+	
+	@ Faz a chamada da função
+	stmfd sp!, {r0-r11, lr}
+	blxge r6
+	ldmfd sp!, {r0-r11, lr}
+
+	@ Remove do contador de funçoes ativas 
+	ldrge r10, [r8]
+	subge r10, r10, #0x01
+	strge r10, [r8]
+
+	add r3, r3, #0x04
         b loop
     
-    end_alarms:
+end_alarms:
 
-    ldmfd sp!, {r4-r11, lr}
+    ldmfd sp!,{r0-r12, lr}
 
-    @ Volta para o modo de processador anterior
     sub lr, lr, #4
     movs pc, lr
 
@@ -274,23 +308,18 @@ IRQ_HANDLER:
 
         @compara com o numero de callbacks registradas ate o momento
         cmp r8, r9
-        bgt SVC_END
+       @ bgt SVC_END
 
         @caso os vetores ainda estejam em uma posicao valida de memoria, continua o loop
         cmp r4, #30
         blt loop_callbacks
 
         @caso nenhuma das condicoes anteriores seja bem sucedida, vai para o final
-        b SVC_END
-
+       @ b SVC_END
 
    
 
 SVC_HANDLER:
-    stmfd sp!, {lr}
-
-    @ Muda o modo de operação para supervisor com interrupções
-    msr CPSR_c, #0xD3
 
     cmp r7, #16
     bleq SYS_READ_SONAR
@@ -313,15 +342,24 @@ SVC_HANDLER:
     cmp r7, #22
     bleq SYS_SET_ALARM
 
-    ldmfd sp!, {lr}
+    cmp r7, #23
+    bleq SYS_ADMIN_MODE
+
+
+
+
+SYS_ADMIN_MODE:
+    @ Muda para o modo IRQ
+    msr  CPSR_c, #0x12
+    ldmfd sp!,{r0}
+
+    msr SPSR, r0
+
+    ldmfd sp!,{r0-r12, lr}
+
+    sub lr, lr, #4
     movs pc, lr
 
-
-@ SYS_READ_SONAR
-@ Syscall que lê o valor de um sonar
-@  -r0 : id do sonar (numero de 0 até 16)
-@ retorna o valor medido pelo sonars
-@ retorna -1 se o valor do sonar estiver incorreto
 
 .align 4
 SYS_READ_SONAR:
@@ -374,7 +412,7 @@ SYS_READ_SONAR:
     @Loop para verifica a cada 10ms se o flag foi modificada
     read_sonar_loop:
         @ Delay de 10ms ((107Khz * 1 ms)/3)
-        ldr r0,=360
+        ldr r0, =360
         delay_10:
             sub r0, r0, #1
             cmp r0, #0
@@ -393,33 +431,35 @@ SYS_READ_SONAR:
     bic r0, r1, r6
     mov r0, r0, lsr #6
 
-    b SVC_END
+    b end_read_sonar
 
 erro_sonar:
     ldr r0, =-1
-    b SVC_END
+
+end_read_sonar:
+    ldmfd sp!, {r4-r11, lr}
+    movs pc, lr
+
 
 
 .align 4
 SYS_REG_PROX_CALLBACK:
     stmfd sp!, {r4-r11, lr}
 
-    @testa as condicoes de callbacks, registradores validos
+    @ Teste de numeros de callbacks
     ldr r4, =N_CALLBACKS
     ldr r4, [r4]
     cmp r4, #MAX_CALLBACKS
     movgt r0, #-1
-    bgt SVC_END
+    bgt end_callback
 
+    @ Teste do número do sonar
     cmp r2, #15
-    movgt r0, #-2
-    bgt SVC_END
+    movhi r0, #-2
+    bhi end_callback
+    
 
-    cmp r2, #0
-    movlt r0, #-2
-    blt SVC_END
-
-    @carrega as posicoes que o comeco dos vetores estao na memoria
+    @ carrega as posicoes dos vetores em r3, r4, r5
     ldr r3, =CALLBACK_ID_VECTOR
     ldr r4, =CALLBACK_DIST_VECTOR
     ldr r5, =CALLBACK_POINTERS_VECTOR
@@ -447,7 +487,14 @@ SYS_REG_PROX_CALLBACK:
     add r2, r2, #1
     str r2, [r1]
 
-    b SVC_END
+    b end_callback
+
+
+end_callback:    
+    ldmfd sp!, {r4-r11, lr}
+    movs pc, lr
+
+
 
 .align 4
 SYS_SET_MOTOR_SPEED:
@@ -458,16 +505,16 @@ SYS_SET_MOTOR_SPEED:
     @ velocidades
     cmp r1, #63
     movhi r0, #-2
-    bhi SVC_END
+    bhi end_motor
 
     @ id dos motores
     cmp r0, #1
     movgt r0, #-1
-    bgt SVC_END
+    bgt end_motor
 
     cmp r0, #0
     movlt r0, #-1
-    blt SVC_END
+    blt end_motor
 
     @ Prepara para colocar as informações no motor
     ldr r5, =GPIO_BASE
@@ -487,7 +534,12 @@ SYS_SET_MOTOR_SPEED:
     strgt r4, [r5, #GPIO_DR]
 
     mov r0, #0
-    b SVC_END
+    b end_motor
+
+end_motor:
+    ldmfd sp!, {r4-r11, lr}
+    movs pc, lr
+
 
 
 .align 4
@@ -498,11 +550,11 @@ SYS_SET_MOTORS_SPEED:
     @compara se é um valor valido de velocidade
     cmp r0, #63
     movhi r0, #-1
-    bhi SVC_END
+    bhi end_motors
 
     cmp r1, #63
     movhi r0, #-2
-    bhi SVC_END
+    bhi end_motors
 
     @coloca o valor de r2 na posicao de memoria correspondente do motor r0
     mov r3, #0
@@ -522,27 +574,38 @@ SYS_SET_MOTORS_SPEED:
     str r4, [r5, #GPIO_DR]
     mov r0, #0
 
-    b SVC_END
+    b end_motors
+
+end_motors:
+    ldmfd sp!, {r4-r11, lr}
+    movs pc, lr
+
+
 
 @ Retorna o valor do tempo do sistema
 .align 4
 SYS_GET_TIME:
     stmfd sp!, {r4-r11, lr}
+    
     @ Passa a posicao de memoria do contador e a carrega em r0
     ldr r1, =TIME_COUNTER
     ldr r0, [r1]
+    
+    ldmfd sp!, {r4-r11, lr}
+    movs pc, lr
 
-    b SVC_END
 
 @ Define o contador de tempo do sistema
 .align 4
 SYS_SET_TIME:
     stmfd sp!, {r4-r11, lr}
+    
     @ Pega o conteudo de r0, parametro, e coloca no tempo
     ldr r1, =TIME_COUNTER
     str r0, [r1]
 
-    b SVC_END
+    ldmfd sp!, {r4-r11, lr}
+    movs pc, lr
 
 .align 4
 SYS_SET_ALARM:
@@ -554,37 +617,42 @@ SYS_SET_ALARM:
     ldr r2, [r2]
     cmp r1, r2
     ldrle r0, =-2
-    ble SVC_END
+    ble end_alarm
+
 
     @ Lê o número de alarmes já criados para saber em que posição colocar opróximo
     ldr r2, =N_ALARMS
     ldr r3, [r2]
-    cmp r3, #8
+    cmp r3, #MAX_ALARMS
     movgt r0, #-1
-    bgt SVC_END
+    bgt end_alarm
+
 
     @ Passou, então já incrementa o N_ALARMS
     add r3, r3, #1
     str r3, [r2]
 
-    @ Como existem lugares a serem alocados no vetor, ele procura esse lugarno vetor do tempo (A primeira posição que possuir -1)
+    @ Como existem lugares a serem alocados no vetor, ele procura esse lugar no vetor do tempo (A primeira posição que possuir -1)
     ldr r2, =ALARMS_TIMER
     ldr r3, =0x0
     search_loop:
         ldr r4, [r2, r3]
-        cmp r4, #-1
-        addne r3, r3, #0x04
-        cmp r3, r3
-        bne search_loop
-
+        cmp r4, #0
+	beq end_search_alarm
+        add r3, r3, #0x04
+        cmp r3, #32
+        blt search_loop
+    end_search_alarm:
+    
     @ Saindo do loop, a posição [r2,r3] contem a posição que deve sercolocada nos vetores
     @ Insere no vetor de tempo
-    ldr r1, [r2,r3]
+    str r1, [r2, r3]
+    
     @ Insere no vetor de função
     ldr r2, =ALARMS_FUNCTIONS
-    ldr r0, [r2, r3]
+    str r0, [r2, r3]
 
-SVC_END:
+end_alarm:
     ldmfd sp!, {r4-r11, lr}
     mov pc, lr
 
