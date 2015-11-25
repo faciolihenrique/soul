@@ -77,9 +77,9 @@ N_CALLBACKS: .word 0x0
 @ Vetores para guardar os valores das callbacks. ponteiros,limiares e identificadores
 CALLBACK_ID_VECTOR:
 .word 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10
-CALLBACK_DIST_VECTOR: 
+CALLBACK_DIST_VECTOR:
 .fill 32
-CALLBACK_POINTERS_VECTOR: 
+CALLBACK_POINTERS_VECTOR:
 .fill 32
 
 @ Vetores que armazenas um ponteriro para uma função e o tempo que deve serexecutado
@@ -222,8 +222,6 @@ IRQ_HANDLER:
     cmp r1, #0x01
     beq end_irq
 
-
-
 irq_alarms:
     @ Percorrer o vetor de alarmes
     ldr r0, =ALARMS_TIMER
@@ -260,21 +258,21 @@ irq_alarms:
         ldrge r6, [r1, r3]
 
         @ Faz a chamada da função
-        
-	
-	stmfd sp!, {r0-r11, lr}
-	
-	ldr r1, =CALLBACK_ACTIVE
-	ldr r0, =0x1
-	str r0, [r1]
-        
-	blxge r6
 
-	ldr r1, =CALLBACK_ACTIVE
-	ldr r0, =0x0
-	str r0, [r1]
 
-	ldmfd sp!, {r0-r11, lr}
+        stmfd sp!, {r0-r11, lr}
+
+        ldr r1, =CALLBACK_ACTIVE
+        ldr r2, =0x1
+        str r2, [r1]
+
+        blxge r6
+
+        ldr r1, =CALLBACK_ACTIVE
+        ldr r2, =0x0
+        str r2, [r1]
+
+        ldmfd sp!, {r0-r11, lr}
 
         @ Remove do contador de funçoes ativas
         ldrge r10, [r8]
@@ -312,28 +310,21 @@ irq_callback:
         @ Algum valor != de 0xA0 foi encontrada na memoria
         sub r8, r8, #0x01
 
-        @ Verifica a leitura do sonar
-	stmfd sp!, {r0-r11, lr}
+        stmfd sp!, {r0-r11, lr}
+        @ Variavel que identifica que nao deve ser executada os alarmes e callback
+        ldr r1, =CALLBACK_ACTIVE
+        ldr r2, =0x1
+        str r2, [r1]
 
-	mrs r1, SPSR
-	stmfd sp!, {r1}
-	
-	ldr r1, =CALLBACK_ACTIVE
-	ldr r0, =0x1
-	str r0, [r1]
-        
+        @ Verifica a leitura do sonar
         mov r7, #16
         svc 0x0
-    
-	ldr r12, r0
-	ldr r1, =CALLBACK_ACTIVE
-	ldr r0, =0x0
-	str r0, [r1]
-		
-	ldmfd sp!,{r1}
-	msr SPSR, r1
 
-	ldmfd sp!, {r0-r11, lr}
+        ldr r1, =CALLBACK_ACTIVE
+        ldr r2, =0x0
+        str r2, [r1]
+
+        ldmfd sp!, {r0-r11, lr}
 
         @ Verifica se já chegou no limiar desejado desejado
         ldr r1, [r5, r3]
@@ -345,21 +336,21 @@ irq_callback:
         @ Faz a chamada da função
         stmfd sp!, {r0-r11, lr}
 
-	ldr r1, =CALLBACK_ACTIVE
-	ldr r0, =0x1
-	str r0, [r1]
+        ldr r1, =CALLBACK_ACTIVE
+        ldr r2, =0x1
+        str r2, [r1]
 
         blxge r2
 
-	ldr r1, =CALLBACK_ACTIVE
-	ldr r0, =0x0
-	str r0, [r1]
-        
-	ldmfd sp!, {r0-r11, lr}
+        ldr r1, =CALLBACK_ACTIVE
+        ldr r2, =0x0
+        str r2, [r1]
+
+        ldmfd sp!, {r0-r11, lr}
 
         @ Remove do contador de funçoes ativas
         add r3, r3, #0x04
-     b loop_irq_callbacks
+        b loop_irq_callbacks
 
 
 end_irq:
@@ -367,60 +358,8 @@ end_irq:
 
     sub lr, lr, #4
     movs pc, lr
-    
 
 
-
-@    @ Callbacks
-@    @ percore o vetor de callbacks, ou seja, as ids, os limiares e os ponteiros @de funcao de retorno
-@    ldr r1, =CALLBACK_ID_VECTOR
-@    ldr r2, =CALLBACK_DIST_VECTOR
-@    ldr r3, =CALLBACK_POINTERS_VECTOR
-@    ldr r4, =0x4
-@
-@    @registrador para comparar com o numero de callbacks pedidas pelo usuario
-@    ldr r8, =0x1
-@    ldr r9, =N_CALLBACKS
-@    ldr r9, [r9]
-@
-@    @ carrega os valores do vetor nos registradores, para realizar as operacoes
-@    @ em r5 o id do sonar, em r6 o limiar e em r3 o ponteiro da funcao
-@    loop_callbacks:
-@        ldr r5, [r1]
-@        ldr r6, [r2]
-@
-@        @chama a sycall para obter o valor da distancia
-@        mov r0, r5
-@        mov r7, #16
-@        svc 0x0
-@
-@        @compara o retorno da funcao com o limiar e move o ponteiro pra pc @condicionalmente
-@        cmp r0, r6
-@        movlt pc, r3
-@
-@        @ soma o valor de r4 com a posicao atual dos vetores para continuar @percorrendo-os
-@        add r1, r1, r4
-@        add r2, r2, r4
-@        add r3, r3, r4
-@
-@        @soma 4 no valor de r4, para continuar a percorrer os vetores
-@        add r4, r4, #4
-@
-@        @soma 1 ao registrador que esta sendo usado para comparar o numero de @callbacks, para nao acessar memoria nao alocada
-@        add r8, r8, #1
-@
-@        @compara com o numero de callbacks registradas ate o momento
-@        cmp r8, r9
-@       @ bgt SVC_END
-@
-@        @caso os vetores ainda estejam em uma posicao valida de memoria, @continua o loop
-@        cmp r4, #30
-@        blt loop_callbacks
-@
-@        @caso nenhuma das condicoes anteriores seja bem sucedida, vai para o @final
-@       @ b SVC_END
-@
-@
 
 SVC_HANDLER:
 
@@ -454,6 +393,10 @@ SVC_HANDLER:
 SYS_READ_SONAR:
     stmfd sp!, {r4-r11, lr}
 
+    ldr r5, =CALLBACK_ACTIVE
+    ldr r6, =0x1
+    str r6, [r1]
+
     @ Carrega a base do GPIO
     ldr r5, =GPIO_BASE
 
@@ -477,7 +420,7 @@ SYS_READ_SONAR:
     str r2, [r5, #GPIO_DR]
 
     @ Delay de 15ms ((107Khz * 1 ms)/3)
-    ldr r0, =540
+    ldr r0, =1700
     delay_15:
         sub r0, r0, #1
         cmp r0, #0
@@ -487,8 +430,8 @@ SYS_READ_SONAR:
     orr r2, r2, #0x02
     str r2, [r5, #GPIO_DR]
 
-    @ Delay de 5ms * ((107Khz * 1 ms)/3)
-    ldr r0, =180
+    @ Delay de 5ms * ((107Khz * 1 ms))
+    ldr r0, =600
     delay_5:
         sub r0, r0, #1
         cmp r0, #0
@@ -501,7 +444,7 @@ SYS_READ_SONAR:
     @Loop para verifica a cada 10ms se o flag foi modificada
     read_sonar_loop:
         @ Delay de 10ms ((107Khz * 1 ms)/3)
-        ldr r0, =360
+        ldr r0, =1100
         delay_10:
             sub r0, r0, #1
             cmp r0, #0
@@ -526,64 +469,12 @@ erro_sonar:
     ldr r0, =-1
 
 end_read_sonar:
+    ldr r5, =CALLBACK_ACTIVE
+    ldr r6, =0x0
+    str r6, [r1]
+
     ldmfd sp!, {r4-r11, lr}
     movs pc, lr
-
-
-
-
-
-.align 4
-@SYS_REG_PROX_CALLBACK:
-@    stmfd sp!, {r4-r11, lr}
-@
-@    @ Teste de numeros de callbacks
-@    ldr r4, =N_CALLBACKS
-@    ldr r4, [r4]
-@    cmp r4, #MAX_CALLBACKS
-@    movgt r0, #-1
-@    bgt end_callback
-@
-@    @ Teste do número do sonar
-@    cmp r2, #15
-@    movhi r0, #-2
-@    bhi end_callback
-@
-@
-@    @ carrega as posicoes dos vetores em r3, r4, r5
-@    ldr r3, =CALLBACK_ID_VECTOR
-@    ldr r4, =CALLBACK_DIST_VECTOR
-@    ldr r5, =CALLBACK_POINTERS_VECTOR
-@
-@    @salva o que foi passado pelo usuario, nas posicoes correspondentes decada @vetor
-@    ldr r6, =SHIFT_CALLBACKS
-@
-@    str r0, [r3, r6]
-@    str r1, [r4, r6]
-@    str r2, [r5, r6]
-@
-@    @coloca valor de retorno no r0
-@    mov r0, #0
-@
-@    @adiciona valor para colocar valores nas posicoes corretas dos vetores
-@    @guarda novo valor do regitrador para deslocamento
-@
-@    ldr r1, [r6]
-@    add r1, r1, #4
-@    str r1, [r6]
-@
-@    @adiciona o contador de callbacks para posterior conferencia
-@    ldr r1, =N_CALLBACKS
-@    ldr r2, [r1]
-@    add r2, r2, #1
-@    str r2, [r1]
-@
-@    b end_callback
-@
-@
-@end_callback:
-@    ldmfd sp!, {r4-r11, lr}
-@    movs pc, lr
 
 
 
@@ -794,6 +685,7 @@ SYS_SET_CALLBACK:
 end_callback:
     ldmfd sp!, {r4-r11, lr}
     movs pc, lr
+
 
 
 @ Para mudar o modo de execução da função do usuario
