@@ -1,12 +1,10 @@
-@ SVC Constants
-.set MAX_ALARMS,            0x08
-.set MAX_CALLBACKS,         0x08
+@ Constantes usadas em SVC
 .set PSR_READ_SONARS,       0b11111111111111110000000000111111
 .set DR_MOTORS,             0b11111101111110000000000000000000
 .set PSR_FLAG,              0b11111111111111111111111111111110
 .set PSR_READ_SONAR,        0b11111111111111100000000000111111
 
-@ GPT Constants
+@ Constantes GPT
 .set GPT_BASE,              0x53FA0000
 .set GPT_CR,                0x00
 .set GPT_PR,                0x04
@@ -18,7 +16,7 @@
 @ Periféricos com clock de 107KHz
 .set TIME_SZ,               107
 
-@ TZIC Constants
+@ Constantes da TZIC
 .set TZIC_BASE,             0x0FFFC000
 .set TZIC_INTCTRL,          0x0
 .set TZIC_INTSEC1,          0x84
@@ -26,29 +24,59 @@
 .set TZIC_PRIOMASK,         0xC
 .set TZIC_PRIORITY9,        0x424
 
-@ CPSR
-.set USER_MODE,		    0x10
-.set SYS_MODE,              0xDF
-.set FIQ_MODE,              0xD1
+@ Modos de Execução
+.set USER_MODE,		        0x10
+.set USER_NO_INTERRUPTION,  0xD0
+.set SYSTEM_MODE,           0xDF
 .set IRQ_MODE,              0x12
 .set IRQ_NO_INTERRUPT,	    0xD2
 .set SUPERVISOR_MODE,       0x13
+.set SUPERVISOR_NO_I,       0xD3
 
-
-@ GPIO Definition
+@ Constantes do GPIO
 .set GPIO_BASE,             0x53F84000
 .set GPIO_DR,               0x00
 .set GPIO_GDIR,             0x04
 .set GPIO_PSR,              0x08
 
-@ Stacks
+@ Alarmes e Callbacks
+.set MAX_ALARMS,            0x08
+.set MAX_CALLBACKS,         0x08
+
+@ Tamanhos das pilhas
 .set STACK_SIZE,            1024
 
-@ USER
+@ User data
 .set USER_TEXT,             0x77803000
 
 
-@@@ Start @@@
+.data
+@ Inicializa os SP em cada modo de execução
+.fill STACK_SIZE
+USER_STACK:
+.fill STACK_SIZE
+SUPERVISOR_STACK:
+.fill STACK_SIZE
+IRQ_STACK:
+.fill STACK_SIZE
+
+@ Variavel para armazenar o tempo de sistema
+TIME_COUNTER: .word 0x0
+
+@ Váriaveis que armazenam inforamções de callbacks
+CALLBACK_ACTIVE: .word 0x0
+N_CALLBACKS: .word 0x0
+CALLBACK_ID_VECTOR: .fill 4*#MAX_CALLBACKS
+CALLBACK_DIST_VECTOR: .fill 4*#MAX_CALLBACKS
+CALLBACK_POINTERS_VECTOR: .fill 4*#MAX_CALLBACKS
+
+@ Variáveis que armazenam informações de alarmes
+N_ALARMS: .word 0x0
+ALARMS_TIMER: 4*#MAX_ALARMS
+ALARMS_FUNCTIONS: 4*#MAX_ALARMS
+
+
+@@@ START @@@
 .org 0x0
 .section .iv,"a"
 
@@ -57,45 +85,13 @@ _start:
 interrupt_vector:
     b RESET_HANDLER
 
-@Software Interrupt
+@ 0x08 é a interrupção SVC
 .org 0x08
     b SVC_HANDLER
 
-
+@ 0x18 é a interrupção IRQ
 .org 0x18
     b IRQ_HANDLER
-
-
-.data
-@ Variavel para armazenar o tempo de sistema
-TIME_COUNTER: .word 0x0
-
-@ Contador de callback
-CALLBACK_ACTIVE: .word 0x0
-N_CALLBACKS: .word 0x0
-
-@ Vetores para guardar os valores das callbacks. ponteiros,limiares e identificadores
-CALLBACK_ID_VECTOR:
-.word 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10
-CALLBACK_DIST_VECTOR:
-.fill 32
-CALLBACK_POINTERS_VECTOR:
-.fill 32
-
-@ Vetores que armazenas um ponteriro para uma função e o tempo que deve serexecutado
-N_ALARMS: .word 0x0
-ALARMS_TIMER: .fill 32
-ALARMS_FUNCTIONS: .fill 32
-
-
-@ Inicializa os stack-pointers
-.fill STACK_SIZE
-USER_STACK:
-.fill STACK_SIZE
-SUPERVISOR_STACK:
-.fill STACK_SIZE
-IRQ_STACK:
-.fill STACK_SIZE
 
 .text
 @ Vetor de interrupcoes
@@ -107,8 +103,30 @@ RESET_HANDLER:
     mov r0,#01
     str r0,[r2]
 
-    @ Zera o número de callbacks
+    @ Zera os callbacks
+    ldr r0, CALLBACK_ID_VECTOR
+    ldr r1, =0x10
+    ldr r2, =0x0
+    ldr r3, =0x0
+    callback_zero:
+        str r1, [r0, r1]
+        add r2, r2, #0x04
+        add r3, r3, #0x01
+        cmp r3, #MAX_CALLBACKS
+        blt callback_zero
+
     @ Zera o número de alarmes
+    ldr r0, ALARMS_TIMER
+    ldr r1, =0
+    ldr r2, =0x0
+    ldr r3, =0x0
+    alarm_zero:
+        str r1, [r0, r1]
+        add r2, r2, #0x04
+        add r3, r3, #0x01
+        cmp r3, #MAX_ALARMS
+        blt alarm_zero
+
 
     @ Iniciliza a pilha de cada um dos modos
     msr CPSR_c, #SUPERVISOR_MODE
@@ -124,7 +142,6 @@ RESET_HANDLER:
 
 
 SET_GPT:
-    @Send data do GPT hardware
     ldr	r1, =GPT_BASE
 
     @ Habilita o GPT
@@ -175,14 +192,13 @@ SET_TZIC:
     mov	r0, #1
     str	r0, [r1, #TZIC_INTCTRL]
 
-    @instrucao msr - habilita interrupcoes
-    msr  CPSR_c, #0x13       @ SUPERVISOR mode, IRQ/FIQ enabled
+    @ Instrucao msr - habilita interrupcoes
+    msr  CPSR_c, #SUPERVISOR_MODE       @ SUPERVISOR mode, IRQ/FIQ enabled
 
 
 
 @ Faz a definição de entrada e saida do GPIO_GDIR
 SET_GPIO:
-
     @ Escreve o binario no registrador do GPIO para definir entrada e saida
     ldr r0, =GPIO_BASE
     ldr r1, =0b11111111111111000000000000111110
@@ -190,7 +206,8 @@ SET_GPIO:
 
     @ Muda para o modo usuário
     msr CPSR_c, #USER_MODE
-    @ Pula para o text do usuário
+
+    @ Pula para o código do usuário
     ldr r1, =USER_TEXT
     mov pc, r1
 
@@ -200,16 +217,12 @@ SET_GPIO:
 IRQ_HANDLER:
     stmfd sp!, {r0-r12, lr}
 
-    @ Salva o estado do programa
-    @mrs r0, SPSR
-    @stmfd sp!, {r0}
-
-
     @ Define o GPT_SR para avisar sobre a interrupção
     ldr	r1, =GPT_BASE
     ldr r0, =1
     str r0, [r1, #GPT_SR]
 
+timer:
     @ Tempo de Sistema
     ldr r2, =TIME_COUNTER           @Load the TIME_COUNTER adress on r2
     ldr r0, [r2]                    @load in r0 the value of r2 adress
@@ -222,8 +235,9 @@ IRQ_HANDLER:
     cmp r1, #0x01
     beq end_irq
 
+@ Percorrer o vetor de alarmes
 irq_alarms:
-    @ Percorrer o vetor de alarmes
+
     ldr r0, =ALARMS_TIMER
     ldr r1, =ALARMS_FUNCTIONS
     ldr r2, =TIME_COUNTER
@@ -234,153 +248,147 @@ irq_alarms:
     ldr r8, =N_ALARMS
     ldr r9, [r8]
 
+loop_irq_alarms:
+    @ Verificação do número de alarmes a serem percorridos
+    cmp r9, #0
+    beq irq_callback
 
-    loop_irq_alarms:
-        cmp r9, #0
-        beq irq_callback
+    @ Carrega em r5 o valor da atual posição do vetor de tempo
+    ldr r5, [r0, r3]
 
-        ldr r5, [r0, r3]
-
-	@Compara com 0 para saber se há uma função ou não
-    	cmp r5, #0
-	addeq r3, r3, #0x04
+    @ Compara para saber se deve executar ele ou não
+    cmp r5, #0
+    addeq r3, r3, #0x04
 	beq loop_irq_alarms
 
-        @ Algum valor != de 0 foi emcontrada na memoria
-        sub r9, r9, #0x01
+    @ Se o valor em r5 for != de 0, subtrai um alarme e segue a execução
+    sub r9, r9, #0x01
 
-        @ Verifica se já chegou no tempo desejado
-        cmp r2, r5
-        ldrge r5, =0x0
-        strge r5, [r0, r3]
+    @ Verifica se já chegou no tempo desejado
+    cmp r2, r5
 
-        @ Carrega em r6 o endereço de chamada
-        ldrge r6, [r1, r3]
+    @ Limpa a posição de execução e carrega em r6 o end da função
+    ldrge r5, =0x0
+    strge r5, [r0, r3]
 
-        @ Faz a chamada da função
+    ldrge r6, [r1, r3]
 
+    @ Faz a chamada da função
+    @ Salva o estado da execução neste ponto
+    stmfd sp!, {r0-r11, lr}
 
-        stmfd sp!, {r0-r11, lr}
-	
-	@ Salva o estado da execução neste ponto
 	mrs r0, SPSR
 	stmfd sp!, {r0}
-        
+
 	ldr r1, =CALLBACK_ACTIVE
-        ldr r2, =0x1
-        str r2, [r1]
+    ldr r2, =0x1
+    str r2, [r1]
 
 	msr CPSR_c, #USER_MODE
-        blxge r6
-	
+    blxge r6
+
 	mov r7, #23
 	svc 0x0
-
 return_from_alarm_svc:
-        ldr r1, =CALLBACK_ACTIVE
-        ldr r2, =0x0
-        str r2, [r1]
+
+    ldr r1, =CALLBACK_ACTIVE
+    ldr r2, =0x0
+    str r2, [r1]
 
 	ldmfd sp!, {r0}
 	msr SPSR, r0
 
-        ldmfd sp!, {r0-r11, lr}
+    ldmfd sp!, {r0-r11, lr}
 
-        @ Remove do contador de funçoes ativas
-        ldrge r10, [r8]
-        subge r10, r10, #0x01
-        strge r10, [r8]
+    @ Remove a função executada do contador de funçoes ativas
+    ldrge r10, [r8]
+    subge r10, r10, #0x01
+    strge r10, [r8]
 
-        add r3, r3, #0x04
+    add r3, r3, #0x04
     b loop_irq_alarms
 
 
-
+@ Percorrer o vetor de callbacks
 irq_callback:
-    @ Percorrer o vetor de callbacks
+
     ldr r4, =CALLBACK_ID_VECTOR
     ldr r5, =CALLBACK_DIST_VECTOR
     ldr r6, =CALLBACK_POINTERS_VECTOR
-
     ldr r3, =0x0
-
     ldr r8, =N_CALLBACKS
     ldr r8, [r8]
 
+loop_irq_callbacks:
+    cmp r8, #0
+    beq end_irq
 
-    loop_irq_callbacks:
-        cmp r8, #0
-        beq end_irq
+    @ Carrega a posição do sonar em r0
+    ldr r0, [r4, r3]
 
-        @ Carrega a posição do sonar em r0
-        ldr r0, [r4, r3]
-        @ Compara com 0x0A para saber se há uma callback nesse endereço ou não
-        cmp r0, #0x10
-        addeq r3, r3, #0x04
-        beq loop_irq_callbacks
+    @ Compara com 0x10 para saber se há uma callback nesse endereço ou não
+    cmp r0, #0x10
+    addeq r3, r3, #0x04
+    beq loop_irq_callbacks
 
-        @ Algum valor != de 0xA0 foi encontrada na memoria
-        sub r8, r8, #0x01
+    @ Algum valor != de 0xA0 foi encontrada na memoria
+    sub r8, r8, #0x01
 
-        stmfd sp!, {r1-r11, lr}
-        @ Variave que identifica que nao deve ser executada os alarmes e callback
-        ldr r1, =CALLBACK_ACTIVE
-        ldr r2, =0x1
-        str r2, [r1]
-	
-	mrs r9, SPSR
+    @ Verifica a leitura do sonar
+    @ Identifica que nao deve ser executada os alarmes e callback no IRQ
+    stmfd sp!, {r1-r11, lr}
+
+    ldr r1, =CALLBACK_ACTIVE
+    ldr r2, =0x1
+    str r2, [r1]
+
+    mrs r9, SPSR
 	stmfd sp!, {r9}
 
-        @ Verifica a leitura do sonar
-        mov r7, #16
-        svc 0x0
-	
+    mov r7, #16
+    svc 0x0
+
 	ldmfd sp!, {r9}
 	msr SPSR, r9
-        
+
 	ldr r1, =CALLBACK_ACTIVE
-        ldr r2, =0x0
-        str r2, [r1]
+    ldr r2, =0x0
+    str r2, [r1]
+    ldmfd sp!, {r1-r11, lr}
 
-        ldmfd sp!, {r1-r11, lr}
+    @ Verifica se já chegou no limiar desejado desejado
+    @ Carrega em r0 o endereço de chamada
+    ldr r1, [r5, r3]
+    cmp r0, r1
+    ldrle r0, [r6, r3]
 
-        @ Verifica se já chegou no limiar desejado desejado
-        ldr r1, [r5, r3]
-        cmp r0, r1
+    @ Faz a chamada da função
+    stmfd sp!, {r0-r11, lr}
 
-        @ Carrega em r6 o endereço de chamada
-        ldrle r0, [r6, r3]
+    ldr r1, =CALLBACK_ACTIVE
+    ldr r2, =0x1
+    str r2, [r1]
 
-        @ Faz a chamada da função
-        stmfd sp!, {r0-r11, lr}
-
-        ldr r1, =CALLBACK_ACTIVE
-        ldr r2, =0x1
-        str r2, [r1]
-	
-	mrs r10, SPSR
+    mrs r10, SPSR
 	stmfd sp!, {r9}
-	
+
 	msr CPSR_c, #USER_MODE
-
-        blxle r0
-
-        mov r7, #24
+    blxle r0
+    mov r7, #24
 	svc 0x0
-
 return_from_callback_svc:
+
 	ldr r1, =CALLBACK_ACTIVE
-        ldr r2, =0x0
-        str r2, [r1]
+    ldr r2, =0x0
+    str r2, [r1]
 
 	ldmfd sp!, {r9}
 	msr SPSR, r10
 
-        ldmfd sp!, {r0-r11, lr}
+    ldmfd sp!, {r0-r11, lr}
 
-        @ Remove do contador de funçoes ativas
-        add r3, r3, #0x04
-        b loop_irq_callbacks
+    add r3, r3, #0x04
+    b loop_irq_callbacks
 
 
 end_irq:
@@ -421,16 +429,6 @@ SVC_HANDLER:
     beq RETURN_CALLBACK_FUNCTION
 
 
-RETURN_ALARM_FUNCTION:
-    msr CPSR_c, 0x12
-    b return_from_callback_svc
-
-
-RETURN_CALLBACK_FUNCTION:
-    msr CPSR_c, 0x12
-    b return_from_callback_svc 
-
-
 .align 4
 SYS_READ_SONAR:
     stmfd sp!, {r4-r11, lr}
@@ -462,7 +460,7 @@ SYS_READ_SONAR:
     str r2, [r5, #GPIO_DR]
 
     @ Delay de 15ms ((107Khz * 1 ms)/3)
-    ldr r0, =5000
+    ldr r0, =8000
     delay_15:
         sub r0, r0, #1
         cmp r0, #0
@@ -473,7 +471,7 @@ SYS_READ_SONAR:
     str r2, [r5, #GPIO_DR]
 
     @ Delay de 5ms * ((107Khz * 1 ms))
-    ldr r0, =5000
+    ldr r0, =2000
     delay_5:
         sub r0, r0, #1
         cmp r0, #0
@@ -483,7 +481,7 @@ SYS_READ_SONAR:
     bic r2, r2, #0x02
     str r2, [r5, #GPIO_DR]
 
-    @Loop para verifica a cada 10ms se o flag foi modificada
+    @ Loop para verifica a cada 10ms se o flag foi modificada
     read_sonar_loop:
         @ Delay de 10ms ((107Khz * 1 ms)/3)
         ldr r0, =5000
@@ -503,7 +501,7 @@ SYS_READ_SONAR:
     @ Pega os valores da leitura do sonar
     ldr r6, =PSR_READ_SONAR
     bic r0, r1, r6
-    mov r0, r0, lsr #6
+    movh r0, r0, lsr #6
 
     b end_read_sonar
 
@@ -525,8 +523,7 @@ SYS_SET_MOTOR_SPEED:
 
     stmfd sp!, {r4-r11, lr}
 
-    @ Verifica se os parametros passados sao validos
-    @ velocidades
+    @verifica se os parametros passados sao validos
     cmp r1, #63
     movhi r0, #-2
     bhi end_motor
@@ -540,18 +537,18 @@ SYS_SET_MOTOR_SPEED:
     movlt r0, #-1
     blt end_motor
 
-    @ Prepara para colocar as informações no motor
+    @prepara para colocar as informações no motor
     ldr r5, =GPIO_BASE
     ldr r4, [r5, #GPIO_DR]
     mov r3, #0
 
-    @ Caso o motor seja o 0
+    @caso o motor seja o 0
     addeq r3, r3, r1, lsl #26
     biceq r4, r4, #0b00000000000000000000000000111111
     orreq r4, r4, r3
     streq r4, [r5, #GPIO_DR]
 
-    @ Caso o motor seja o 1
+    @caso o motor seja o 1
     addgt r3, r3, r1, lsl #19
     bicgt r4, r4, #0b00000000000000000001111110000000
     orrgt r4, r4, r3
@@ -571,7 +568,7 @@ SYS_SET_MOTORS_SPEED:
 
     stmfd sp!, {r4-r11, lr}
 
-    @compara se é um valor valido de velocidade
+    @ Compara se é um valor valido de velocidade
     cmp r0, #63
     movhi r0, #-1
     bhi end_motors
@@ -580,16 +577,16 @@ SYS_SET_MOTORS_SPEED:
     movhi r0, #-2
     bhi end_motors
 
-    @coloca o valor de r2 na posicao de memoria correspondente do motor r0
+    @ Coloca o valor de r2 na posicao de memoria correspondente do motor r0
     mov r3, #0
 
-    @desloca o valor 26 bits, para cair na faixa do motor 0, com 0 no valorde write (talvez bit de write)
+    @ Desloca o valor 26 bits, para cair na faixa do motor 0, com 0 no valor de write do motor 0
     orr r3, r3, r1, lsl #26
 
-    @soma o valor de r1, que ja vai ficar no local correto
+    @ Faz um OR com valor de r1, que ja vai ficar no local correto
     orr r3, r3, r0, lsl #19
 
-    @passa endereco armazenar nos dados
+    @ Armazena os valores em GPIO
     ldr r5, =GPIO_BASE
     ldr r4, [r5, #GPIO_DR]
     ldr r6, =DR_MOTORS
@@ -611,9 +608,9 @@ end_motors:
 SYS_GET_TIME:
     stmfd sp!, {r4-r11, lr}
 
-    @ Passa a posicao de memoria do contador e a carrega em r0
-    ldr r1, =TIME_COUNTER
-    ldr r0, [r1]
+    @ Carrega em r0 o valor da memória do contador
+    ldr r0, =TIME_COUNTER
+    ldr r0, [r0]
 
     ldmfd sp!, {r4-r11, lr}
     movs pc, lr
@@ -624,7 +621,7 @@ SYS_GET_TIME:
 SYS_SET_TIME:
     stmfd sp!, {r4-r11, lr}
 
-    @ Pega o conteudo de r0, parametro, e coloca no tempo
+    @ Substitui o tempo do sistema
     ldr r1, =TIME_COUNTER
     str r0, [r1]
 
@@ -729,13 +726,12 @@ end_callback:
     movs pc, lr
 
 
+.align 4
+RETURN_ALARM_FUNCTION:
+    msr CPSR_c, IRQ_MODE
+    b return_from_callback_svc
 
-@ Para mudar o modo de execução da função do usuario
-SYS_ADMIN_MODE:
-    @ Muda para o modo IRQ
-    msr  CPSR_c, #0x12
-    ldmfd sp!,{r0}
-    msr SPSR, r0
-    ldmfd sp!,{r0-r12, lr}
-    sub lr, lr, #4
-    movs pc, lr
+.align 4
+RETURN_CALLBACK_FUNCTION:
+    msr CPSR_c, IRQ_MODE
+    b return_from_callback_svc
