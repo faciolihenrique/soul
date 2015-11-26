@@ -4,4 +4,5 @@ LOCO.x
 SOUL.x
 disk.img
 bico.s
-
+*.swp
+loco.c
