@@ -1,8 +1,7 @@
 @ Constantes usadas em SVC
-.set PSR_READ_SONARS,       0b11111111111111110000000000111111
 .set DR_MOTORS,             0b11111101111110000000000000000000
 .set PSR_FLAG,              0b11111111111111111111111111111110
-.set PSR_READ_SONAR,        0b11111111111111100000000000111111
+.set PSR_READ_SONAR,        0b1111111111111100000000000111111
 
 @ Constantes GPT
 .set GPT_BASE,              0x53FA0000
@@ -27,7 +26,7 @@
 @ Modos de Execução
 .set USER_MODE,		        0x10
 .set USER_NO_INTERRUPTION,  0xD0
-.set SYSTEM_MODE,           0xDF
+.set SYS_MODE,              0xDF
 .set IRQ_MODE,              0x12
 .set IRQ_NO_INTERRUPT,	    0xD2
 .set SUPERVISOR_MODE,       0x13
@@ -50,32 +49,6 @@
 .set USER_TEXT,             0x77803000
 
 
-.data
-@ Inicializa os SP em cada modo de execução
-.fill STACK_SIZE
-USER_STACK:
-.fill STACK_SIZE
-SUPERVISOR_STACK:
-.fill STACK_SIZE
-IRQ_STACK:
-.fill STACK_SIZE
-
-@ Variavel para armazenar o tempo de sistema
-TIME_COUNTER: .word 0x0
-
-@ Váriaveis que armazenam inforamções de callbacks
-CALLBACK_ACTIVE: .word 0x0
-N_CALLBACKS: .word 0x0
-CALLBACK_ID_VECTOR: .fill 4*#MAX_CALLBACKS
-CALLBACK_DIST_VECTOR: .fill 4*#MAX_CALLBACKS
-CALLBACK_POINTERS_VECTOR: .fill 4*#MAX_CALLBACKS
-
-@ Variáveis que armazenam informações de alarmes
-N_ALARMS: .word 0x0
-ALARMS_TIMER: 4*#MAX_ALARMS
-ALARMS_FUNCTIONS: 4*#MAX_ALARMS
-
-
 @@@ START @@@
 .org 0x0
 .section .iv,"a"
@@ -93,6 +66,36 @@ interrupt_vector:
 .org 0x18
     b IRQ_HANDLER
 
+
+
+.data
+@ Inicializa os SP em cada modo de execução
+.fill STACK_SIZE
+USER_STACK:
+.fill STACK_SIZE
+SUPERVISOR_STACK:
+.fill STACK_SIZE
+IRQ_STACK:
+.fill STACK_SIZE
+
+@ Variavel para armazenar o tempo de sistema
+TIME_COUNTER: .word 0x0
+
+@ Váriaveis que armazenam inforamções de callbacks
+CALLBACK_ACTIVE: .word 0x0
+N_CALLBACKS: .word 0x0
+CALLBACK_ID_VECTOR: .word 0x10,0x10,0x10,0x10,0x10,0x10,0x10
+CALLBACK_DIST_VECTOR: .fill 32
+CALLBACK_POINTERS_VECTOR: .fill 32
+
+@ Variáveis que armazenam informações de alarmes
+N_ALARMS: .word 0x0
+ALARMS_TIMER: .fill 32
+ALARMS_FUNCTIONS: .fill 32
+
+
+
+
 .text
 @ Vetor de interrupcoes
 .org 0x100
@@ -103,30 +106,7 @@ RESET_HANDLER:
     mov r0,#01
     str r0,[r2]
 
-    @ Zera os callbacks
-    ldr r0, CALLBACK_ID_VECTOR
-    ldr r1, =0x10
-    ldr r2, =0x0
-    ldr r3, =0x0
-    callback_zero:
-        str r1, [r0, r1]
-        add r2, r2, #0x04
-        add r3, r3, #0x01
-        cmp r3, #MAX_CALLBACKS
-        blt callback_zero
-
-    @ Zera o número de alarmes
-    ldr r0, ALARMS_TIMER
-    ldr r1, =0
-    ldr r2, =0x0
-    ldr r3, =0x0
-    alarm_zero:
-        str r1, [r0, r1]
-        add r2, r2, #0x04
-        add r3, r3, #0x01
-        cmp r3, #MAX_ALARMS
-        blt alarm_zero
-
+   
 
     @ Iniciliza a pilha de cada um dos modos
     msr CPSR_c, #SUPERVISOR_MODE
@@ -441,11 +421,9 @@ SYS_READ_SONAR:
     ldr r5, =GPIO_BASE
 
     @ Verifica se o valor passado é valido
-    cmp r0, #0
-    blt erro_sonar
-    cmp r0, #16
-    bge erro_sonar
-
+    cmp r0, #15
+    bhi erro_sonar
+    
     @ Faz um clear dos bits do sonar, do trigger e do FLAG no GDIR
     ldr r2, [r5, #GPIO_DR]
     bic r2, r2,  #0b00000000000000000000000000111111
@@ -459,8 +437,8 @@ SYS_READ_SONAR:
     orr r2, r1, r2
     str r2, [r5, #GPIO_DR]
 
-    @ Delay de 15ms ((107Khz * 1 ms)/3)
-    ldr r0, =8000
+    @ Delay de 15ms ((107Khz * 1 ms))
+    ldr r0, =9999
     delay_15:
         sub r0, r0, #1
         cmp r0, #0
@@ -471,7 +449,7 @@ SYS_READ_SONAR:
     str r2, [r5, #GPIO_DR]
 
     @ Delay de 5ms * ((107Khz * 1 ms))
-    ldr r0, =2000
+    ldr r0, =3333
     delay_5:
         sub r0, r0, #1
         cmp r0, #0
@@ -484,7 +462,7 @@ SYS_READ_SONAR:
     @ Loop para verifica a cada 10ms se o flag foi modificada
     read_sonar_loop:
         @ Delay de 10ms ((107Khz * 1 ms)/3)
-        ldr r0, =5000
+        ldr r0, =6666
         delay_10:
             sub r0, r0, #1
             cmp r0, #0
@@ -501,7 +479,7 @@ SYS_READ_SONAR:
     @ Pega os valores da leitura do sonar
     ldr r6, =PSR_READ_SONAR
     bic r0, r1, r6
-    movh r0, r0, lsr #6
+    mov r0, r0, lsr #6
 
     b end_read_sonar
 

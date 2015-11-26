@@ -1,56 +1,52 @@
 #include "bico.h"
-void turn_left();
-void go_on();
-void stop_com_rollingstones();
+void vira_parede();
+void segue_parede();
 
 void _start(){
-    int k;
-    int i = 0;
-    short unsigned int j = 0;
-    
-    //go_on();
+    int i;
+    int speed;
+    unsigned int dist[17];
+    short unsigned int dist1 = 600, dist3 = 1500, dist4 = 1500;
 
-    register_proximity_callback(4, 1000, go_on);
-
-    register_proximity_callback(1, 500, turn_left);
-
-    //add_alarm(turn_left, 10000);
-    
-   // add_alarm(go_on, 200);
-    
-    //add_alarm(turn_left, 500);
+    //set_motors_speed(20,20);
    
-    //add_alarm(go_on, 1000);
+    read_sonars(dist);
 
-    
-    //add_alarm(turn_left, 2000);
-    
-    //add_alarm(go_on, 3000);
+    read_sonar(0, &dist1);
+    /*while(dist3 > 400 && dist4 > 400){
+        read_sonar(3, &dist3);
+        read_sonar(4, &dist4);
+    }
+    set_motors_speed(0, 10);
+    while(dist1 > 450){
+        read_sonar(0, &dist1);
+    }*/
 
-    //add_alarm(turn_left, 4500);
+    //register_proximity_callback(4 ,400 ,vira_parede);
     
-    //add_alarm(go_on, 6000);
-
+    /*while(1){
+        read_sonar(0, &dist1);    
+        speed = (int) (dist1/50);
+        set_motors_speed(speed , 10);
+    }*/
     
     while(1){
-    //read_sonar(4, &j);
-
-    //if(j < 1200){
-//	set_motors_speed(0,0);
-//	while(1){
-//	
-//	}
+    
     }
-    set_motors_speed(0,0);
-
 }
 
-void go_on(){
-    set_motors_speed(30,30);
+void segue_parede(){
+    int i;
+    
+    short unsigned int dist0 = 2000;
 }
 
-void turn_left(){
-    set_motors_speed(0 ,63);
+void vira_parede(){
+    short unsigned int dist1 = 2000;
+    set_motors_speed(30, 25);
+    while(dist1 > 500){
+        read_sonar(0, &dist1);
+    }
 }
 
 void stop_com_rollingstones(){
