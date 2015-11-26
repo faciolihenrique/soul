@@ -55,5 +55,11 @@ player:
 sim_debug:
 	 armsim_player --rom=/home/specg12-1/mc404/simulador/simulador_player/bin/dumboot.bin --sd=disk.img -g
 
+sim_debug2:
+	 armsim_player --rom=/home/specg12-1/mc404/simulador/simulador_player/bin/dumboot.bin --sd=disk.img -g --debug=core
+
 sim:
-	 armsim_player --rom=/home/specg12-1/mc404/simulador/simulador_player/bin/dumboot.bin --sd=disk.img 
+	 armsim_player --rom=/home/specg12-1/mc404/simulador/simulador_player/bin/dumboot.bin --sd=disk.img
+
+gdb:
+	arm-eabi-gdb -ex 'target remote localhost:5000' SOUL.x

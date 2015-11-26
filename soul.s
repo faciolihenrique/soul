@@ -261,16 +261,28 @@ irq_alarms:
 
 
         stmfd sp!, {r0-r11, lr}
-
-        ldr r1, =CALLBACK_ACTIVE
+	
+	@ Salva o estado da execução neste ponto
+	mrs r0, SPSR
+	stmfd sp!, {r0}
+        
+	ldr r1, =CALLBACK_ACTIVE
         ldr r2, =0x1
         str r2, [r1]
 
+	msr CPSR_c, #USER_MODE
         blxge r6
+	
+	mov r7, #23
+	svc 0x0
 
+return_from_alarm_svc:
         ldr r1, =CALLBACK_ACTIVE
         ldr r2, =0x0
         str r2, [r1]
+
+	ldmfd sp!, {r0}
+	msr SPSR, r0
 
         ldmfd sp!, {r0-r11, lr}
 
@@ -310,28 +322,34 @@ irq_callback:
         @ Algum valor != de 0xA0 foi encontrada na memoria
         sub r8, r8, #0x01
 
-        stmfd sp!, {r0-r11, lr}
-        @ Variavel que identifica que nao deve ser executada os alarmes e callback
+        stmfd sp!, {r1-r11, lr}
+        @ Variave que identifica que nao deve ser executada os alarmes e callback
         ldr r1, =CALLBACK_ACTIVE
         ldr r2, =0x1
         str r2, [r1]
+	
+	mrs r9, SPSR
+	stmfd sp!, {r9}
 
         @ Verifica a leitura do sonar
         mov r7, #16
         svc 0x0
-
-        ldr r1, =CALLBACK_ACTIVE
+	
+	ldmfd sp!, {r9}
+	msr SPSR, r9
+        
+	ldr r1, =CALLBACK_ACTIVE
         ldr r2, =0x0
         str r2, [r1]
 
-        ldmfd sp!, {r0-r11, lr}
+        ldmfd sp!, {r1-r11, lr}
 
         @ Verifica se já chegou no limiar desejado desejado
         ldr r1, [r5, r3]
         cmp r0, r1
 
         @ Carrega em r6 o endereço de chamada
-        ldrle r2, [r6, r3]
+        ldrle r0, [r6, r3]
 
         @ Faz a chamada da função
         stmfd sp!, {r0-r11, lr}
@@ -339,12 +357,24 @@ irq_callback:
         ldr r1, =CALLBACK_ACTIVE
         ldr r2, =0x1
         str r2, [r1]
+	
+	mrs r10, SPSR
+	stmfd sp!, {r9}
+	
+	msr CPSR_c, #USER_MODE
 
-        blxge r2
+        blxle r0
 
-        ldr r1, =CALLBACK_ACTIVE
+        mov r7, #24
+	svc 0x0
+
+return_from_callback_svc:
+	ldr r1, =CALLBACK_ACTIVE
         ldr r2, =0x0
         str r2, [r1]
+
+	ldmfd sp!, {r9}
+	msr SPSR, r10
 
         ldmfd sp!, {r0-r11, lr}
 
@@ -384,9 +414,21 @@ SVC_HANDLER:
     cmp r7, #22
     beq SYS_SET_ALARM
 
-@    cmp r7, #23
-@    beq SYS_ADMIN_MODE
+    cmp r7, #23
+    beq RETURN_ALARM_FUNCTION
 
+    cmp r7, #24
+    beq RETURN_CALLBACK_FUNCTION
+
+
+RETURN_ALARM_FUNCTION:
+    msr CPSR_c, 0x12
+    b return_from_callback_svc
+
+
+RETURN_CALLBACK_FUNCTION:
+    msr CPSR_c, 0x12
+    b return_from_callback_svc 
 
 
 .align 4
@@ -420,7 +462,7 @@ SYS_READ_SONAR:
     str r2, [r5, #GPIO_DR]
 
     @ Delay de 15ms ((107Khz * 1 ms)/3)
-    ldr r0, =1700
+    ldr r0, =5000
     delay_15:
         sub r0, r0, #1
         cmp r0, #0
@@ -431,7 +473,7 @@ SYS_READ_SONAR:
     str r2, [r5, #GPIO_DR]
 
     @ Delay de 5ms * ((107Khz * 1 ms))
-    ldr r0, =600
+    ldr r0, =5000
     delay_5:
         sub r0, r0, #1
         cmp r0, #0
@@ -444,7 +486,7 @@ SYS_READ_SONAR:
     @Loop para verifica a cada 10ms se o flag foi modificada
     read_sonar_loop:
         @ Delay de 10ms ((107Khz * 1 ms)/3)
-        ldr r0, =1100
+        ldr r0, =5000
         delay_10:
             sub r0, r0, #1
             cmp r0, #0
