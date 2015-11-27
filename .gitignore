@@ -6,3 +6,4 @@ disk.img
 bico.s
 *.swp
 loco.c
+*.un~
